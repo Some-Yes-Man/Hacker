@@ -33,7 +33,7 @@
             // 
             this.btnRun.Anchor = System.Windows.Forms.AnchorStyles.None;
             this.tabLayPnlMain.SetColumnSpan(this.btnRun, 2);
-            this.btnRun.Location = new System.Drawing.Point(362, 423);
+            this.btnRun.Location = new System.Drawing.Point(554, 434);
             this.btnRun.Name = "btnRun";
             this.btnRun.Size = new System.Drawing.Size(75, 23);
             this.btnRun.TabIndex = 0;
@@ -54,7 +54,7 @@
             this.tabLayPnlMain.RowCount = 2;
             this.tabLayPnlMain.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
             this.tabLayPnlMain.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 30F));
-            this.tabLayPnlMain.Size = new System.Drawing.Size(800, 450);
+            this.tabLayPnlMain.Size = new System.Drawing.Size(1184, 461);
             this.tabLayPnlMain.TabIndex = 1;
             // 
             // txtBoxLog
@@ -66,14 +66,14 @@
             this.txtBoxLog.Name = "txtBoxLog";
             this.txtBoxLog.ReadOnly = true;
             this.txtBoxLog.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.txtBoxLog.Size = new System.Drawing.Size(794, 414);
+            this.txtBoxLog.Size = new System.Drawing.Size(1178, 425);
             this.txtBoxLog.TabIndex = 1;
             // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(800, 450);
+            this.ClientSize = new System.Drawing.Size(1184, 461);
             this.Controls.Add(this.tabLayPnlMain);
             this.Name = "Form1";
             this.Text = "Shredded & Scrambled";

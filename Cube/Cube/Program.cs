@@ -551,7 +551,7 @@ namespace Cube {
                             }
                         }
                     }
-                    Console.WriteLine("Number of valid solutions: " + validSolutionsPerStep[pieceIndex].Count + " [tries: " + tries + "]");
+                    Console.WriteLine("Number of valid solutions (piece #" + pieceIndex + "): " + validSolutionsPerStep[pieceIndex].Count + " [tries: " + tries + "]");
                 }
 
                 // report back
