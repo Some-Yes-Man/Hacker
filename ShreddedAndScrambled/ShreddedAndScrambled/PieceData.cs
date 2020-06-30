@@ -21,6 +21,8 @@ namespace ShreddedAndScrambled {
         public const byte BIT_SPACING = 1;
         public const byte BIT_LENGTH = 2;
 
+        public static readonly byte EDGE_MATCH_BYTE = (byte)(Math.Pow(2, BIT_COUNT) - 1);
+
         public enum Direction {
             NORTH, SOUTH, EAST, WEST, UNKNOWN
         }
@@ -193,27 +195,39 @@ namespace ShreddedAndScrambled {
         }
 
         private static bool BitmapRowIsCore(Bitmap bitmap, byte y, Color backgroundColor) {
-            byte dataPixelCount = 0;
+            byte consecutiveDataPixels = 0;
             for (byte x = 0; x < bitmap.Width; x++) {
                 if (!bitmap.GetPixel(x, y).Equals(backgroundColor)) {
-                    dataPixelCount++;
+                    consecutiveDataPixels++;
+                }
+                else {
+                    consecutiveDataPixels = 0;
+                }
+                if (consecutiveDataPixels == 3) {
+                    return true;
                 }
             }
-            return dataPixelCount > BIT_COUNT * BIT_THICCNESS;
+            return false;
         }
 
         private static bool BitmapColIsCore(Bitmap bitmap, byte x, Color backgroundColor) {
-            byte dataPixelCount = 0;
-            for (byte y = 0; y < bitmap.Width; y++) {
+            byte consecutiveDataPixels = 0;
+            for (byte y = 0; y < bitmap.Height; y++) {
                 if (!bitmap.GetPixel(x, y).Equals(backgroundColor)) {
-                    dataPixelCount++;
+                    consecutiveDataPixels++;
+                }
+                else {
+                    consecutiveDataPixels = 0;
+                }
+                if (consecutiveDataPixels == 3) {
+                    return true;
                 }
             }
-            return dataPixelCount > BIT_COUNT * BIT_THICCNESS;
+            return false;
         }
 
         private static bool EdgeMatches(byte edgeA, byte edgeB) {
-            return (edgeA ^ edgeB) == 7;
+            return (edgeA ^ edgeB) == EDGE_MATCH_BYTE;
         }
 
         public static bool EdgeMatches(PieceData pieceA, PieceData pieceB, Direction edgeOnA) {
@@ -244,7 +258,7 @@ namespace ShreddedAndScrambled {
 
         public static int GetRgbDistance(Color[] keysA, Color[] keysB) {
             int distance = 0;
-            for (int i = 0; i < BIT_COUNT+1; i++) {
+            for (int i = 0; i < BIT_COUNT + 1; i++) {
                 distance += PieceData.ColorDistance(keysA[i], keysB[i]);
             }
             return distance;
