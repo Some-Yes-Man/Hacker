@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Drawing;
 
 namespace ShreddedAndScrambled {
-    public class PieceData {
+    public class PuzzlePiece {
         private static readonly Logger LOGGER = LogManager.GetCurrentClassLogger();
 
         // puzzle #2
@@ -23,10 +23,6 @@ namespace ShreddedAndScrambled {
 
         public static readonly byte EDGE_MATCH_BYTE = (byte)(Math.Pow(2, BIT_COUNT) - 1);
 
-        public enum Direction {
-            NORTH, SOUTH, EAST, WEST, UNKNOWN
-        }
-
         public byte NorthEdge { get; set; }
         public byte SouthEdge { get; set; }
         public byte EastEdge { get; set; }
@@ -43,12 +39,11 @@ namespace ShreddedAndScrambled {
         public Color[,] ImageData { get; set; }
         public Color AverageColor { get; set; }
         public Color DeviationColor { get; set; }
-        public bool AlreadyUsed { get; set; }
         public string Filename { get; set; }
 
-        private PieceData() { }
+        private PuzzlePiece() { }
 
-        public PieceData(string filename) {
+        public PuzzlePiece(string filename) {
             this.Filename = filename;
             this.PuzzleEdges = new HashSet<Direction>();
             this.ImageData = new Color[DATA_WIDTH, DATA_HEIGHT];
@@ -59,10 +54,10 @@ namespace ShreddedAndScrambled {
             Color backgroundColor = bitmap.GetPixel(0, 0);
             byte startX = 0;
             byte startY = 0;
-            while (!PieceData.BitmapColIsCore(bitmap, startX, backgroundColor)) {
+            while (!PuzzlePiece.BitmapColIsCore(bitmap, startX, backgroundColor)) {
                 startX++;
             }
-            while (!PieceData.BitmapRowIsCore(bitmap, startY, backgroundColor)) {
+            while (!PuzzlePiece.BitmapRowIsCore(bitmap, startY, backgroundColor)) {
                 startY++;
             }
             // remove bit length from starting positions to catch outer bits
@@ -140,28 +135,28 @@ namespace ShreddedAndScrambled {
             }
 
             // KEYS
-            this.NorthKeys = new Color[BIT_COUNT + 1];
-            this.NorthKeysHsl = new Color[BIT_COUNT + 1];
-            for (int n = 0; n <= BIT_COUNT; n++) {
-                this.NorthKeys[n] = this.ImageData[(BIT_OFFSET - 1) + n * (BIT_THICCNESS + BIT_SPACING), BIT_LENGTH];
+            this.NorthKeys = new Color[DATA_WIDTH - 2 * BIT_LENGTH];
+            this.NorthKeysHsl = new Color[DATA_WIDTH - 2 * BIT_LENGTH];
+            for (int n = 0; n < this.NorthKeys.Length; n++) {
+                this.NorthKeys[n] = this.FindFirstColorInColumn(n, backgroundColor);
                 this.NorthKeysHsl[n] = Color.FromArgb((int)Math.Floor(this.NorthKeys[n].GetHue() / 360 * 255), (int)Math.Floor(this.NorthKeys[n].GetSaturation() * 255), (int)Math.Floor(this.NorthKeys[n].GetBrightness() * 255));
             }
-            this.SouthKeys = new Color[BIT_COUNT + 1];
-            this.SouthKeysHsl = new Color[BIT_COUNT + 1];
-            for (int s = 0; s <= BIT_COUNT; s++) {
-                this.SouthKeys[s] = this.ImageData[(BIT_OFFSET - 1) + s * (BIT_THICCNESS + BIT_SPACING), DATA_HEIGHT - BIT_LENGTH - 1];
+            this.SouthKeys = new Color[DATA_WIDTH - 2 * BIT_LENGTH];
+            this.SouthKeysHsl = new Color[DATA_WIDTH - 2 * BIT_LENGTH];
+            for (int s = 0; s < this.SouthKeys.Length; s++) {
+                this.SouthKeys[s] = this.FindLastColorInColumn(s, backgroundColor);
                 this.SouthKeysHsl[s] = Color.FromArgb((int)Math.Floor(this.SouthKeys[s].GetHue() / 360 * 255), (int)Math.Floor(this.SouthKeys[s].GetSaturation() * 255), (int)Math.Floor(this.SouthKeys[s].GetBrightness() * 255));
             }
-            this.EastKeys = new Color[BIT_COUNT + 1];
-            this.EastKeysHsl = new Color[BIT_COUNT + 1];
-            for (int e = 0; e <= BIT_COUNT; e++) {
-                this.EastKeys[e] = this.ImageData[DATA_WIDTH - BIT_LENGTH - 1, (BIT_OFFSET - 1) + e * (BIT_THICCNESS + BIT_SPACING)];
+            this.EastKeys = new Color[DATA_HEIGHT - 2 * BIT_LENGTH];
+            this.EastKeysHsl = new Color[DATA_HEIGHT - 2 * BIT_LENGTH];
+            for (int e = 0; e < this.EastKeys.Length; e++) {
+                this.EastKeys[e] = this.FindLastColorInRow(e, backgroundColor);
                 this.EastKeysHsl[e] = Color.FromArgb((int)Math.Floor(this.EastKeys[e].GetHue() / 360 * 255), (int)Math.Floor(this.EastKeys[e].GetSaturation() * 255), (int)Math.Floor(this.EastKeys[e].GetBrightness() * 255));
             }
-            this.WestKeys = new Color[BIT_COUNT + 1];
-            this.WestKeysHsl = new Color[BIT_COUNT + 1];
-            for (int w = 0; w <= BIT_COUNT; w++) {
-                this.WestKeys[w] = this.ImageData[BIT_LENGTH, (BIT_OFFSET - 1) + w * (BIT_THICCNESS + BIT_SPACING)];
+            this.WestKeys = new Color[DATA_HEIGHT - 2 * BIT_LENGTH];
+            this.WestKeysHsl = new Color[DATA_HEIGHT - 2 * BIT_LENGTH];
+            for (int w = 0; w < this.WestKeys.Length; w++) {
+                this.WestKeys[w] = this.FindFirstColorInRow(w, backgroundColor);
                 this.WestKeysHsl[w] = Color.FromArgb((int)Math.Floor(this.WestKeys[w].GetHue() / 360 * 255), (int)Math.Floor(this.WestKeys[w].GetSaturation() * 255), (int)Math.Floor(this.WestKeys[w].GetBrightness() * 255));
             }
 
@@ -226,11 +221,51 @@ namespace ShreddedAndScrambled {
             return false;
         }
 
+        private Color FindFirstColorInColumn(int x, Color backgroundColor) {
+            for (int i = BIT_LENGTH; i < DATA_HEIGHT - BIT_LENGTH; i++) {
+                if (!this.ImageData[x + BIT_LENGTH, i].IsEmpty) {
+                    return this.ImageData[x + BIT_LENGTH, i];
+                }
+            }
+            throw new IndexOutOfRangeException("Could not find something other than the background color.");
+        }
+
+        private Color FindLastColorInColumn(int x, Color backgroundColor) {
+            for (int i = DATA_HEIGHT - BIT_LENGTH - 1; i >= BIT_LENGTH; i--) {
+                if (!this.ImageData[x + BIT_LENGTH, i].IsEmpty) {
+                    return this.ImageData[x + BIT_LENGTH, i];
+                }
+            }
+            throw new IndexOutOfRangeException("Could not find something other than the background color.");
+        }
+
+        private Color FindFirstColorInRow(int y, Color backgroundColor) {
+            for (int i = BIT_LENGTH; i < DATA_WIDTH - BIT_LENGTH; i++) {
+                if (!this.ImageData[i, y + BIT_LENGTH].IsEmpty) {
+                    return this.ImageData[i, y + BIT_LENGTH];
+                }
+            }
+            throw new IndexOutOfRangeException("Could not find something other than the background color.");
+        }
+
+        private Color FindLastColorInRow(int y, Color backgroundColor) {
+            for (int i = DATA_WIDTH - BIT_LENGTH - 1; i >= BIT_LENGTH; i--) {
+                if (!this.ImageData[i, y + BIT_LENGTH].IsEmpty) {
+                    return this.ImageData[i, y + BIT_LENGTH];
+                }
+            }
+            throw new IndexOutOfRangeException("Could not find something other than the background color.");
+        }
+
         private static bool EdgeMatches(byte edgeA, byte edgeB) {
             return (edgeA ^ edgeB) == EDGE_MATCH_BYTE;
         }
 
-        public static bool EdgeMatches(PieceData pieceA, PieceData pieceB, Direction edgeOnA) {
+        public static byte InvertEdge(byte edge) {
+            return (byte)(edge ^ EDGE_MATCH_BYTE);
+        }
+
+        public static bool EdgeMatches(PuzzlePiece pieceA, PuzzlePiece pieceB, Direction edgeOnA) {
             switch (edgeOnA) {
                 case Direction.NORTH:
                     return EdgeMatches(pieceA.NorthEdge, pieceB.SouthEdge);
@@ -245,7 +280,7 @@ namespace ShreddedAndScrambled {
             }
         }
 
-        public bool EdgeMatches(PieceData otherPiece, Direction edgeOnThis) {
+        public bool EdgeMatches(PuzzlePiece otherPiece, Direction edgeOnThis) {
             return EdgeMatches(this, otherPiece, edgeOnThis);
         }
 
@@ -256,10 +291,18 @@ namespace ShreddedAndScrambled {
             return r * r + g * g + b * b;
         }
 
+        public static int ColorDistanceWiki(Color colorA, Color colorB) {
+            int meanR = (colorA.R + colorB.R) / 2;
+            double diffR = (colorA.R - colorB.R);
+            double diffG = (colorA.G - colorB.G);
+            double diffB = (colorA.B - colorB.B);
+            return (int)Math.Sqrt((diffR * diffR * (2 + meanR / 256)) + (diffG * diffG * 4) + (diffB * diffB * (2 + (255 - meanR) / 256)));
+        }
+
         public static int GetRgbDistance(Color[] keysA, Color[] keysB) {
             int distance = 0;
             for (int i = 0; i < BIT_COUNT + 1; i++) {
-                distance += PieceData.ColorDistance(keysA[i], keysB[i]);
+                distance += PuzzlePiece.ColorDistanceWiki(keysA[i], keysB[i]);
             }
             return distance;
         }
@@ -267,7 +310,7 @@ namespace ShreddedAndScrambled {
         public static int GetHslDistance(Color[] keysA, Color[] keysB) {
             int distance = 0;
             for (int i = 0; i < BIT_COUNT + 1; i++) {
-                distance += PieceData.ColorDistance(keysA[i], keysB[i]);
+                distance += PuzzlePiece.ColorDistance(keysA[i], keysB[i]);
             }
             return distance;
         }

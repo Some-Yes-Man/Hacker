@@ -12,12 +12,12 @@ namespace Unreal {
             if (bits.Count % 8 != 0)
                 numBytes++;
 
-            byte[] bytes = new byte[ numBytes ];
+            byte[] bytes = new byte[numBytes];
             int byteIndex = 0, bitIndex = 0;
 
             for (int i = 0; i < bits.Count; i++) {
-                if (bits[ i ])
-                    bytes[ byteIndex ] |= (byte) (1 << (7 - bitIndex));
+                if (bits[i])
+                    bytes[byteIndex] |= (byte)(1 << (7 - bitIndex));
 
                 bitIndex++;
                 if (bitIndex == 8) {
@@ -41,12 +41,12 @@ namespace Unreal {
             while (currentRemainingDigits > 0) {
                 if (currentRemainingDigits < currentFraction) {
                     //Console.Write("0");
-                    bitStream[ divCount ] = false;
+                    bitStream[divCount] = false;
                 }
                 else {
                     currentRemainingDigits -= currentFraction;
                     //Console.Write("1");
-                    bitStream[ divCount ] = true;
+                    bitStream[divCount] = true;
                 }
                 currentFraction = BigInteger.DivRem(currentFraction, 2, out remainder);
                 if (!remainder.IsZero && !currentRemainingDigits.IsZero) {
@@ -68,7 +68,7 @@ namespace Unreal {
             BigInteger multiplier = 1;
             BigInteger sum = 0;
             for (int i = divCount - 1; i >= 288; i--) {
-                sum += bitStream[ i ] ? multiplier : 0;
+                sum += bitStream[i] ? multiplier : 0;
                 multiplier *= 2;
             }
             //for (int i = 288; i <= divCount; i++) {
@@ -106,7 +106,16 @@ namespace Unreal {
                 //Console.ReadKey(true);
             }
 
-            Console.WriteLine(Encoding.ASCII.GetString(byteStream));
+            String anotherCastle = Encoding.ASCII.GetString(byteStream);
+            foreach (byte b in byteStream) {
+                Console.Write("#" + b);
+            }
+            Console.WriteLine();
+            Console.WriteLine(anotherCastle);
+            String again = anotherCastle.Substring(anotherCastle.IndexOf("`") + 1, anotherCastle.LastIndexOf("'") - anotherCastle.IndexOf("`") - 1);
+            Console.WriteLine(anotherCastle.IndexOf("`"));
+            Console.WriteLine(anotherCastle.LastIndexOf("'") - anotherCastle.IndexOf("`") - 1);
+            Console.WriteLine(again);
             Console.ReadKey(true);
         }
     }
