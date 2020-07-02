@@ -8,13 +8,13 @@ namespace ShreddedAndScrambled {
         private static readonly Logger LOGGER = LogManager.GetCurrentClassLogger();
 
         // puzzle #2
-        //public const byte DATA_WIDTH = 18;
-        //public const byte DATA_HEIGHT = 18;
-        //public const byte BIT_COUNT = 3;
+        public const byte DATA_WIDTH = 18;
+        public const byte DATA_HEIGHT = 18;
+        public const byte BIT_COUNT = 3;
         // puzzle #1
-        public const byte DATA_WIDTH = 24;
-        public const byte DATA_HEIGHT = 24;
-        public const byte BIT_COUNT = 5;
+        //public const byte DATA_WIDTH = 24;
+        //public const byte DATA_HEIGHT = 24;
+        //public const byte BIT_COUNT = 5;
 
         public const byte BIT_THICCNESS = 2;
         public const byte BIT_OFFSET = 5;
@@ -23,6 +23,9 @@ namespace ShreddedAndScrambled {
 
         public static readonly byte EDGE_MATCH_BYTE = (byte)(Math.Pow(2, BIT_COUNT) - 1);
 
+        private static int ID_GENERATOR = 0;
+
+        public int Id { get; private set; }
         public byte NorthEdge { get; set; }
         public byte SouthEdge { get; set; }
         public byte EastEdge { get; set; }
@@ -44,6 +47,7 @@ namespace ShreddedAndScrambled {
         private PuzzlePiece() { }
 
         public PuzzlePiece(string filename) {
+            this.Id = ++ID_GENERATOR;
             this.Filename = filename;
             this.PuzzleEdges = new HashSet<Direction>();
             this.ImageData = new Color[DATA_WIDTH, DATA_HEIGHT];
@@ -189,6 +193,18 @@ namespace ShreddedAndScrambled {
             // TODO: include corner colors?
         }
 
+        public override int GetHashCode() {
+            return this.Id;
+        }
+
+        public override bool Equals(object obj) {
+            PuzzlePiece other = obj as PuzzlePiece;
+            if (other == null) {
+                return false;
+            }
+            return this.Id.Equals(other.Id);
+        }
+
         private static bool BitmapRowIsCore(Bitmap bitmap, byte y, Color backgroundColor) {
             byte consecutiveDataPixels = 0;
             for (byte x = 0; x < bitmap.Width; x++) {
@@ -284,14 +300,15 @@ namespace ShreddedAndScrambled {
             return EdgeMatches(this, otherPiece, edgeOnThis);
         }
 
-        public static int ColorDistance(Color colorA, Color colorB) {
-            int r = colorA.R - colorB.R;
-            int g = colorA.G - colorB.G;
-            int b = colorA.B - colorB.B;
-            return r * r + g * g + b * b;
+        private static int ColorDistanceHsl(Color colorA, Color colorB) {
+            int h = colorA.R - colorB.R;
+            int s = colorA.G - colorB.G;
+            int l = colorA.B - colorB.B;
+            return h * h + s * s + l * l;
+            //return l * l;
         }
 
-        public static int ColorDistanceWiki(Color colorA, Color colorB) {
+        private static int ColorDistanceWiki(Color colorA, Color colorB) {
             int meanR = (colorA.R + colorB.R) / 2;
             double diffR = (colorA.R - colorB.R);
             double diffG = (colorA.G - colorB.G);
@@ -299,7 +316,7 @@ namespace ShreddedAndScrambled {
             return (int)Math.Sqrt((diffR * diffR * (2 + meanR / 256)) + (diffG * diffG * 4) + (diffB * diffB * (2 + (255 - meanR) / 256)));
         }
 
-        public static int GetRgbDistance(Color[] keysA, Color[] keysB) {
+        private static int GetRgbDistance(Color[] keysA, Color[] keysB) {
             int distance = 0;
             for (int i = 0; i < BIT_COUNT + 1; i++) {
                 distance += PuzzlePiece.ColorDistanceWiki(keysA[i], keysB[i]);
@@ -307,12 +324,27 @@ namespace ShreddedAndScrambled {
             return distance;
         }
 
-        public static int GetHslDistance(Color[] keysA, Color[] keysB) {
+        private static int GetHslDistance(Color[] keysA, Color[] keysB) {
             int distance = 0;
             for (int i = 0; i < BIT_COUNT + 1; i++) {
-                distance += PuzzlePiece.ColorDistance(keysA[i], keysB[i]);
+                distance += PuzzlePiece.ColorDistanceHsl(keysA[i], keysB[i]);
             }
             return distance;
+        }
+
+        public static int GetPieceEdgeDistance(PuzzlePiece pieceA, PuzzlePiece pieceB, Direction edgeOnA) {
+            switch (edgeOnA) {
+                case Direction.NORTH:
+                    return GetRgbDistance(pieceA.NorthKeys, pieceB.SouthKeys) + GetHslDistance(pieceA.NorthKeys, pieceB.SouthKeys);
+                case Direction.SOUTH:
+                    return GetRgbDistance(pieceA.SouthKeys, pieceB.NorthKeys) + GetHslDistance(pieceA.SouthKeys, pieceB.NorthKeys);
+                case Direction.EAST:
+                    return GetRgbDistance(pieceA.EastKeys, pieceB.WestKeys) + GetHslDistance(pieceA.EastKeys, pieceB.WestKeys);
+                case Direction.WEST:
+                    return GetRgbDistance(pieceA.WestKeys, pieceB.EastKeys) + GetHslDistance(pieceA.WestKeys, pieceB.EastKeys);
+                default:
+                    throw new ArgumentException("Unknown direction.");
+            }
         }
 
     }
