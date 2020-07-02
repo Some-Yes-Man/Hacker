@@ -26,11 +26,9 @@
             this.btnRun = new System.Windows.Forms.Button();
             this.tabLayPnlMain = new System.Windows.Forms.TableLayoutPanel();
             this.txtBoxLog = new System.Windows.Forms.TextBox();
-            this.picBoxMaster = new System.Windows.Forms.PictureBox();
-            this.picBoxSub = new System.Windows.Forms.PictureBox();
+            this.PicBoxMaster = new System.Windows.Forms.PictureBox();
             this.tabLayPnlMain.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.picBoxMaster)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.picBoxSub)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.PicBoxMaster)).BeginInit();
             this.SuspendLayout();
             // 
             // btnRun
@@ -48,17 +46,17 @@
             // tabLayPnlMain
             // 
             this.tabLayPnlMain.ColumnCount = 2;
-            this.tabLayPnlMain.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 50F));
-            this.tabLayPnlMain.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 50F));
-            this.tabLayPnlMain.Controls.Add(this.btnRun, 0, 2);
-            this.tabLayPnlMain.Controls.Add(this.txtBoxLog, 0, 1);
-            this.tabLayPnlMain.Controls.Add(this.picBoxMaster, 0, 0);
-            this.tabLayPnlMain.Controls.Add(this.picBoxSub, 1, 0);
+            this.tabLayPnlMain.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            this.tabLayPnlMain.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 300F));
+            this.tabLayPnlMain.Controls.Add(this.btnRun, 0, 3);
+            this.tabLayPnlMain.Controls.Add(this.txtBoxLog, 0, 2);
+            this.tabLayPnlMain.Controls.Add(this.PicBoxMaster, 0, 0);
             this.tabLayPnlMain.Dock = System.Windows.Forms.DockStyle.Fill;
             this.tabLayPnlMain.Location = new System.Drawing.Point(0, 0);
             this.tabLayPnlMain.Name = "tabLayPnlMain";
-            this.tabLayPnlMain.RowCount = 3;
-            this.tabLayPnlMain.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 600F));
+            this.tabLayPnlMain.RowCount = 4;
+            this.tabLayPnlMain.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 300F));
+            this.tabLayPnlMain.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 300F));
             this.tabLayPnlMain.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
             this.tabLayPnlMain.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 30F));
             this.tabLayPnlMain.Size = new System.Drawing.Size(1184, 861);
@@ -76,25 +74,17 @@
             this.txtBoxLog.Size = new System.Drawing.Size(1178, 225);
             this.txtBoxLog.TabIndex = 1;
             // 
-            // picBoxMaster
+            // PicBoxMaster
             // 
-            this.picBoxMaster.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.picBoxMaster.Location = new System.Drawing.Point(3, 3);
-            this.picBoxMaster.Name = "picBoxMaster";
-            this.picBoxMaster.Size = new System.Drawing.Size(586, 594);
-            this.picBoxMaster.SizeMode = System.Windows.Forms.PictureBoxSizeMode.CenterImage;
-            this.picBoxMaster.TabIndex = 2;
-            this.picBoxMaster.TabStop = false;
-            // 
-            // picBoxSub
-            // 
-            this.picBoxSub.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.picBoxSub.Location = new System.Drawing.Point(595, 3);
-            this.picBoxSub.Name = "picBoxSub";
-            this.picBoxSub.Size = new System.Drawing.Size(586, 594);
-            this.picBoxSub.SizeMode = System.Windows.Forms.PictureBoxSizeMode.CenterImage;
-            this.picBoxSub.TabIndex = 3;
-            this.picBoxSub.TabStop = false;
+            this.PicBoxMaster.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.PicBoxMaster.Location = new System.Drawing.Point(3, 3);
+            this.PicBoxMaster.Name = "PicBoxMaster";
+            this.tabLayPnlMain.SetRowSpan(this.PicBoxMaster, 2);
+            this.PicBoxMaster.Size = new System.Drawing.Size(878, 594);
+            this.PicBoxMaster.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
+            this.PicBoxMaster.TabIndex = 2;
+            this.PicBoxMaster.TabStop = false;
+            this.PicBoxMaster.Click += new System.EventHandler(this.PicBoxMaster_Click);
             // 
             // Form1
             // 
@@ -103,11 +93,11 @@
             this.ClientSize = new System.Drawing.Size(1184, 861);
             this.Controls.Add(this.tabLayPnlMain);
             this.Name = "Form1";
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "Shredded & Scrambled";
             this.tabLayPnlMain.ResumeLayout(false);
             this.tabLayPnlMain.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.picBoxMaster)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.picBoxSub)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.PicBoxMaster)).EndInit();
             this.ResumeLayout(false);
 
         }
@@ -117,8 +107,7 @@
         private System.Windows.Forms.Button btnRun;
         private System.Windows.Forms.TableLayoutPanel tabLayPnlMain;
         private System.Windows.Forms.TextBox txtBoxLog;
-        private System.Windows.Forms.PictureBox picBoxMaster;
-        private System.Windows.Forms.PictureBox picBoxSub;
+        private System.Windows.Forms.PictureBox PicBoxMaster;
     }
 }
 
