@@ -8,13 +8,13 @@ namespace ShreddedAndScrambled {
         private static readonly Logger LOGGER = LogManager.GetCurrentClassLogger();
 
         // puzzle #2
-        public const byte DATA_WIDTH = 18;
-        public const byte DATA_HEIGHT = 18;
-        public const byte BIT_COUNT = 3;
+        //public const byte DATA_WIDTH = 18;
+        //public const byte DATA_HEIGHT = 18;
+        //public const byte BIT_COUNT = 3;
         // puzzle #1
-        //public const byte DATA_WIDTH = 24;
-        //public const byte DATA_HEIGHT = 24;
-        //public const byte BIT_COUNT = 5;
+        public const byte DATA_WIDTH = 24;
+        public const byte DATA_HEIGHT = 24;
+        public const byte BIT_COUNT = 5;
 
         public const byte BIT_THICCNESS = 2;
         public const byte BIT_OFFSET = 5;
@@ -205,6 +205,10 @@ namespace ShreddedAndScrambled {
             return this.Id.Equals(other.Id);
         }
 
+        public override string ToString() {
+            return this.Id.ToString();
+        }
+
         private static bool BitmapRowIsCore(Bitmap bitmap, byte y, Color backgroundColor) {
             byte consecutiveDataPixels = 0;
             for (byte x = 0; x < bitmap.Width; x++) {
@@ -301,11 +305,11 @@ namespace ShreddedAndScrambled {
         }
 
         private static int ColorDistanceHsl(Color colorA, Color colorB) {
-            int h = colorA.R - colorB.R;
-            int s = colorA.G - colorB.G;
+            //int h = colorA.R - colorB.R;
+            //int s = colorA.G - colorB.G;
             int l = colorA.B - colorB.B;
-            return h * h + s * s + l * l;
-            //return l * l;
+            //return h * h + s * s + l * l;
+            return l * l;
         }
 
         private static int ColorDistanceWiki(Color colorA, Color colorB) {

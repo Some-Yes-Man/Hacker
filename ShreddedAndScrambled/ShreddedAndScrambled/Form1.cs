@@ -23,16 +23,16 @@ namespace ShreddedAndScrambled {
             LOGGER.Log(level, message, args);
         }
 
-        private const string PIECE_DIRECTORY = @"C:\Users\rkrausse\Downloads\ManyPieces";
-        //private const string PIECE_DIRECTORY = @"C:\Users\rkrausse\Downloads\Pieces";
+        //private const string PIECE_DIRECTORY = @"C:\Users\rkrausse\Downloads\ManyPieces";
+        private const string PIECE_DIRECTORY = @"C:\Users\rkrausse\Downloads\Pieces";
         //private const string PIECE_DIRECTORY = @"E:\Yes-Man\Downloads\ManyPieces";
         //private const string PIECE_DIRECTORY = @"E:\Yes-Man\Downloads\Pieces";
 
-        private const double DISTANCE_FACTOR_2ND_PLACE = 0.6;
-        private const int DISTANCE_THRESHOLD = 5000;
+        private const double DISTANCE_FACTOR_2ND_PLACE = 0.8;
+        private const int DISTANCE_THRESHOLD = 1000;
         private const int SUCCESS_CUTOFF = 1000;
-        private const int SUCCESS_MIN_PIECE_COUNT = 40;
-        private const int MASTER_ADD_MIN_MATCH_COUNT = 10;
+        private const int SUCCESS_MIN_PIECE_COUNT = 15;
+        private const int MASTER_ADD_MIN_MATCH_COUNT = 5;
 
         private BackgroundWorker imageAnalysisWorker;
         private BackgroundWorker crossAnalysisWorker;
