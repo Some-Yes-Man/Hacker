@@ -32,6 +32,7 @@
             this.PicBoxMaster = new System.Windows.Forms.PictureBox();
             this.ListViewPieceSelection = new System.Windows.Forms.ListView();
             this.ListViewColOne = new System.Windows.Forms.ColumnHeader();
+            this.BtnReset = new System.Windows.Forms.Button();
             this.tabLayPnlMain.SuspendLayout();
             this.GrpBoxSelection.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.PicBoxSelection)).BeginInit();
@@ -42,8 +43,7 @@
             // btnRun
             // 
             this.btnRun.Anchor = System.Windows.Forms.AnchorStyles.None;
-            this.tabLayPnlMain.SetColumnSpan(this.btnRun, 2);
-            this.btnRun.Location = new System.Drawing.Point(554, 934);
+            this.btnRun.Location = new System.Drawing.Point(379, 934);
             this.btnRun.Name = "btnRun";
             this.btnRun.Size = new System.Drawing.Size(75, 23);
             this.btnRun.TabIndex = 0;
@@ -53,39 +53,42 @@
             // 
             // tabLayPnlMain
             // 
-            this.tabLayPnlMain.ColumnCount = 2;
+            this.tabLayPnlMain.ColumnCount = 3;
             this.tabLayPnlMain.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            this.tabLayPnlMain.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 350F));
+            this.tabLayPnlMain.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 175F));
+            this.tabLayPnlMain.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 175F));
             this.tabLayPnlMain.Controls.Add(this.btnRun, 0, 3);
             this.tabLayPnlMain.Controls.Add(this.txtBoxLog, 0, 2);
             this.tabLayPnlMain.Controls.Add(this.GrpBoxSelection, 1, 0);
             this.tabLayPnlMain.Controls.Add(this.GrpBoxMain, 0, 0);
             this.tabLayPnlMain.Controls.Add(this.ListViewPieceSelection, 1, 1);
+            this.tabLayPnlMain.Controls.Add(this.BtnReset, 1, 3);
             this.tabLayPnlMain.Dock = System.Windows.Forms.DockStyle.Fill;
             this.tabLayPnlMain.Location = new System.Drawing.Point(0, 0);
             this.tabLayPnlMain.Name = "tabLayPnlMain";
             this.tabLayPnlMain.RowCount = 4;
             this.tabLayPnlMain.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 350F));
-            this.tabLayPnlMain.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 300F));
             this.tabLayPnlMain.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            this.tabLayPnlMain.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 200F));
             this.tabLayPnlMain.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 30F));
             this.tabLayPnlMain.Size = new System.Drawing.Size(1184, 961);
             this.tabLayPnlMain.TabIndex = 1;
             // 
             // txtBoxLog
             // 
-            this.tabLayPnlMain.SetColumnSpan(this.txtBoxLog, 2);
+            this.tabLayPnlMain.SetColumnSpan(this.txtBoxLog, 3);
             this.txtBoxLog.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.txtBoxLog.Location = new System.Drawing.Point(3, 653);
+            this.txtBoxLog.Location = new System.Drawing.Point(3, 734);
             this.txtBoxLog.Multiline = true;
             this.txtBoxLog.Name = "txtBoxLog";
             this.txtBoxLog.ReadOnly = true;
             this.txtBoxLog.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.txtBoxLog.Size = new System.Drawing.Size(1178, 275);
+            this.txtBoxLog.Size = new System.Drawing.Size(1178, 194);
             this.txtBoxLog.TabIndex = 1;
             // 
             // GrpBoxSelection
             // 
+            this.tabLayPnlMain.SetColumnSpan(this.GrpBoxSelection, 2);
             this.GrpBoxSelection.Controls.Add(this.PicBoxSelection);
             this.GrpBoxSelection.Dock = System.Windows.Forms.DockStyle.Fill;
             this.GrpBoxSelection.Location = new System.Drawing.Point(837, 3);
@@ -112,7 +115,7 @@
             this.GrpBoxMain.Location = new System.Drawing.Point(3, 3);
             this.GrpBoxMain.Name = "GrpBoxMain";
             this.tabLayPnlMain.SetRowSpan(this.GrpBoxMain, 2);
-            this.GrpBoxMain.Size = new System.Drawing.Size(828, 644);
+            this.GrpBoxMain.Size = new System.Drawing.Size(828, 725);
             this.GrpBoxMain.TabIndex = 4;
             this.GrpBoxMain.TabStop = false;
             this.GrpBoxMain.Text = "Current Solution";
@@ -122,17 +125,20 @@
             this.PicBoxMaster.Dock = System.Windows.Forms.DockStyle.Fill;
             this.PicBoxMaster.Location = new System.Drawing.Point(3, 19);
             this.PicBoxMaster.Name = "PicBoxMaster";
-            this.PicBoxMaster.Size = new System.Drawing.Size(822, 622);
+            this.PicBoxMaster.Size = new System.Drawing.Size(822, 703);
             this.PicBoxMaster.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
             this.PicBoxMaster.TabIndex = 2;
             this.PicBoxMaster.TabStop = false;
             this.PicBoxMaster.Click += new System.EventHandler(this.PicBoxMaster_Click);
+            this.PicBoxMaster.MouseDown += new System.Windows.Forms.MouseEventHandler(this.PicBoxMaster_MouseDown);
+            this.PicBoxMaster.MouseUp += new System.Windows.Forms.MouseEventHandler(this.PicBoxMaster_MouseUp);
             // 
             // ListViewPieceSelection
             // 
             this.ListViewPieceSelection.Activation = System.Windows.Forms.ItemActivation.TwoClick;
             this.ListViewPieceSelection.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
             this.ListViewColOne});
+            this.tabLayPnlMain.SetColumnSpan(this.ListViewPieceSelection, 2);
             this.ListViewPieceSelection.Dock = System.Windows.Forms.DockStyle.Fill;
             this.ListViewPieceSelection.FullRowSelect = true;
             this.ListViewPieceSelection.HideSelection = false;
@@ -140,7 +146,7 @@
             this.ListViewPieceSelection.MultiSelect = false;
             this.ListViewPieceSelection.Name = "ListViewPieceSelection";
             this.ListViewPieceSelection.ShowGroups = false;
-            this.ListViewPieceSelection.Size = new System.Drawing.Size(344, 294);
+            this.ListViewPieceSelection.Size = new System.Drawing.Size(344, 375);
             this.ListViewPieceSelection.TabIndex = 5;
             this.ListViewPieceSelection.UseCompatibleStateImageBehavior = false;
             this.ListViewPieceSelection.DoubleClick += new System.EventHandler(this.ListViewPieceSelection_DoubleClick);
@@ -148,6 +154,18 @@
             // ListViewColOne
             // 
             this.ListViewColOne.Name = "ListViewColOne";
+            this.ListViewColOne.Width = -2;
+            // 
+            // BtnReset
+            // 
+            this.BtnReset.Anchor = System.Windows.Forms.AnchorStyles.None;
+            this.BtnReset.Location = new System.Drawing.Point(884, 934);
+            this.BtnReset.Name = "BtnReset";
+            this.BtnReset.Size = new System.Drawing.Size(75, 23);
+            this.BtnReset.TabIndex = 6;
+            this.BtnReset.Text = "Reset";
+            this.BtnReset.UseVisualStyleBackColor = true;
+            this.BtnReset.Click += new System.EventHandler(this.BtnReset_Click);
             // 
             // Form1
             // 
@@ -179,6 +197,7 @@
         private System.Windows.Forms.GroupBox GrpBoxMain;
         private System.Windows.Forms.ListView ListViewPieceSelection;
         private System.Windows.Forms.ColumnHeader ListViewColOne;
+        private System.Windows.Forms.Button BtnReset;
     }
 }
 

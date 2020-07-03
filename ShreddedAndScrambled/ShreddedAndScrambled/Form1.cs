@@ -31,14 +31,14 @@ namespace ShreddedAndScrambled {
         //private const string PIECE_DIRECTORY = @"E:\Yes-Man\Downloads\ManyPieces";
         //private const string PIECE_DIRECTORY = @"E:\Yes-Man\Downloads\Pieces";
 
-        private const double DISTANCE_FACTOR_2ND_PLACE = 1.5;
-        private const int DISTANCE_THRESHOLD = 1000;
-        private const int MASTER_ADD_MIN_MATCH_COUNT = 5;
-        private const double DISTANCE_TOP_FACTOR = 0.01;
+        private const double DISTANCE_FACTOR_2ND_PLACE = 2;
+        private const double DISTANCE_TOP_FACTOR = 0.02;
         private const int IMAGE_LIST_ZOOM_FACTOR = 4;
+        private const int RENDER_PADDING = 1;
 
         private static readonly Dictionary<Direction, Dictionary<byte, HashSet<PuzzlePiece>>> COUNTER_EDGE_MAP = new Dictionary<Direction, Dictionary<byte, HashSet<PuzzlePiece>>>();
         private static readonly List<PuzzlePiece> PIECE_DATA = new List<PuzzlePiece>();
+        private static readonly object masterLock = new object();
 
         private readonly Dictionary<int, Dictionary<int, PuzzlePiece>> masterPuzzle = new Dictionary<int, Dictionary<int, PuzzlePiece>>();
         private readonly HashSet<PuzzlePiece> piecesUsedInMaster = new HashSet<PuzzlePiece>();
@@ -50,6 +50,12 @@ namespace ShreddedAndScrambled {
 
         private Point puzzleSelectionCoords;
         private bool puzzleSelectionEmpty;
+        private bool firstRun = true;
+        private Random prng = new Random();
+        private int dynamicDistanceThreshold = int.MaxValue;
+        private Point deleteMouseDown;
+        private Point deleteMouseUp;
+        private bool interruptSolver = false;
 
         public Form1() {
             InitializeComponent();
@@ -66,11 +72,22 @@ namespace ShreddedAndScrambled {
         }
 
         private void Run_Click(object sender, EventArgs e) {
-            txtBoxLog.Clear();
+            this.interruptSolver = false;
 
             if (PIECE_DATA.Count == 0) {
                 this.RunImageFileAnalysis();
             }
+            else {
+                this.RunPuzzleSolver();
+            }
+        }
+
+        private void BtnReset_Click(object sender, EventArgs e) {
+            this.masterPuzzle.Clear();
+            this.piecesUsedInMaster.Clear();
+            this.firstRun = true;
+            this.interruptSolver = false;
+            this.RunPuzzleSolver();
         }
 
         // initial analysis
@@ -251,25 +268,37 @@ namespace ShreddedAndScrambled {
         }
 
         private void PuzzleSolverWorker_DoWork(object sender, DoWorkEventArgs e) {
-            AddPieceToPuzzle(0, 0, PIECE_DATA.Find(x => x.PuzzleEdges.Contains(Direction.SOUTH) && x.PuzzleEdges.Contains(Direction.WEST)), this.masterPuzzle, this.piecesUsedInMaster);
-            //AddPieceToPuzzle(0, 0, this.pieceData.Find(x => x.Filename.EndsWith("3FED7F1.png")), finishedSubPuzzle, usedPieces);
-            //AddPieceToPuzzle(0, 0, this.pieceData[this.prng.Next(this.pieceData.Count)], finishedSubPuzzle, usedPieces);
+            BackgroundWorker worker = sender as BackgroundWorker;
+
+            if (this.firstRun) {
+                //AddPieceToPuzzle(0, 0, PIECE_DATA.Find(x => x.PuzzleEdges.Contains(Direction.NORTH) && x.PuzzleEdges.Contains(Direction.WEST)), this.masterPuzzle, this.piecesUsedInMaster);
+                //AddPieceToPuzzle(0, 0, PIECE_DATA.Find(x => x.Filename.EndsWith("52974AF.png")), this.masterPuzzle, this.piecesUsedInMaster);
+                AddPieceToPuzzle(0, 0, PIECE_DATA.Find(x => x.Filename.EndsWith("B678A14.png")), this.masterPuzzle, this.piecesUsedInMaster);
+                //AddPieceToPuzzle(0, 0, PIECE_DATA[this.prng.Next(PIECE_DATA.Count)], this.masterPuzzle, this.piecesUsedInMaster);
+                this.firstRun = false;
+            }
 
             int addedPieces = int.MaxValue;
 
-            while (addedPieces > 0) {
+            while ((addedPieces > 0) && !interruptSolver) {
                 addedPieces = 0;
 
                 List<MissingPiece> missingNeighboringPieces = new List<MissingPiece>();
                 // iterate all piece that are done
                 foreach (KeyValuePair<int, Dictionary<int, PuzzlePiece>> finishedColumn in this.masterPuzzle) {
+                    if (this.interruptSolver) {
+                        break;
+                    }
                     foreach (KeyValuePair<int, PuzzlePiece> finishedPiece in finishedColumn.Value) {
+                        if (this.interruptSolver) {
+                            break;
+                        }
                         // add every missing neighbor of the current piece
                         foreach (Tuple<int, int> emptySpot in GetMissingNeighbors(finishedColumn.Key, finishedPiece.Key, this.masterPuzzle)) {
                             // skip if possible
                             if (missingNeighboringPieces.Any(x => (x.X == emptySpot.Item1) && (x.Y == emptySpot.Item2))) {
                                 LOGGER.Debug("Skipped duplicate missing neighbor.");
-                                break;
+                                continue;
                             }
 
                             MissingPiece missingPiece = new MissingPiece {
@@ -278,25 +307,12 @@ namespace ShreddedAndScrambled {
                                 Edges = new Dictionary<Direction, byte>(GetSurroundingPieces(emptySpot.Item1, emptySpot.Item2, this.masterPuzzle).Select(x => new KeyValuePair<Direction, byte>(x.Key, GetCounterEdgeFromPiece(x.Value, x.Key))))
                             };
                             // all physically matching pieces (that were not already used) plus their optical match
-                            List<Tuple<PuzzlePiece, int>> sortedMatches = new List<Tuple<PuzzlePiece, int>>();
+                            List<Tuple<PuzzlePiece, int>> ratedFittingPieces = new List<Tuple<PuzzlePiece, int>>();
                             foreach (PuzzlePiece physicallyMatchingPiece in GetPhysicallyFittingPieces(missingPiece.Edges, PIECE_DATA, this.piecesUsedInMaster)) {
-                                int opticalDistance = 0;
-                                if (missingPiece.Edges.ContainsKey(Direction.NORTH)) {
-                                    opticalDistance += PuzzlePiece.GetPieceEdgeDistance(physicallyMatchingPiece, this.masterPuzzle[emptySpot.Item1][emptySpot.Item2 - 1], Direction.NORTH);
-                                }
-                                if (missingPiece.Edges.ContainsKey(Direction.SOUTH)) {
-                                    opticalDistance += PuzzlePiece.GetPieceEdgeDistance(physicallyMatchingPiece, this.masterPuzzle[emptySpot.Item1][emptySpot.Item2 + 1], Direction.SOUTH);
-                                }
-                                if (missingPiece.Edges.ContainsKey(Direction.EAST)) {
-                                    opticalDistance += PuzzlePiece.GetPieceEdgeDistance(physicallyMatchingPiece, this.masterPuzzle[emptySpot.Item1 + 1][emptySpot.Item2], Direction.EAST);
-                                }
-                                if (missingPiece.Edges.ContainsKey(Direction.WEST)) {
-                                    opticalDistance += PuzzlePiece.GetPieceEdgeDistance(physicallyMatchingPiece, this.masterPuzzle[emptySpot.Item1 - 1][emptySpot.Item2], Direction.WEST);
-                                }
-                                sortedMatches.Add(new Tuple<PuzzlePiece, int>(physicallyMatchingPiece, opticalDistance));
+                                ratedFittingPieces.Add(new Tuple<PuzzlePiece, int>(physicallyMatchingPiece, PuzzlePiece.GetPieceMultiEdgeDistance(physicallyMatchingPiece, GetSurroundingPieces(emptySpot.Item1, emptySpot.Item2, this.masterPuzzle))));
                             }
                             // sort by optical difference
-                            missingPiece.MatchingPieces.AddRange(sortedMatches.OrderBy(x => x.Item2).ToList());
+                            missingPiece.MatchingPieces.AddRange(ratedFittingPieces.OrderBy(x => x.Item2).ToList());
                             missingNeighboringPieces.Add(missingPiece);
 
                             // some feedback
@@ -322,30 +338,69 @@ namespace ShreddedAndScrambled {
                 }
 
                 // add the good matches to the scene
-                foreach (MissingPiece missing in missingNeighboringPieces) {
+                foreach (MissingPiece missing in missingNeighboringPieces.OrderBy(x => x.Edges.Count)) {
                     if ((missing.MatchingPieces.Count == 0) && (this.piecesUsedInMaster.Count != PIECE_DATA.Count)) {
                         LOGGER.Debug("Couldn't find any more matching pieces.");
-                        return;
+                        continue;
                     }
                     // either just one option or a good one was found
-                    if ((missing.MatchingPieces.Count == 1) || ((missing.MatchingPieces[0].Item2 * DISTANCE_FACTOR_2ND_PLACE <= missing.MatchingPieces[1].Item2) && (missing.MatchingPieces[0].Item2 < DISTANCE_THRESHOLD))) {
+                    if ((missing.MatchingPieces.Count == 1) || ((missing.MatchingPieces[0].Item2 * DISTANCE_FACTOR_2ND_PLACE <= missing.MatchingPieces[1].Item2) && (missing.MatchingPieces[0].Item2 < this.dynamicDistanceThreshold))) {
                         LOGGER.Debug("Added piece with distance of {dist}.", missing.MatchingPieces[0].Item2);
                         AddPieceToPuzzle(missing.X, missing.Y, missing.MatchingPieces[0].Item1, this.masterPuzzle, this.piecesUsedInMaster);
                         addedPieces++;
                     }
                 }
+
+                worker.ReportProgress(0);
+
                 LOGGER.Debug("Added {count} pieces to the puzzle.", addedPieces);
             }
+
+            this.interruptSolver = false;
 
             LOGGER.Debug("Could not add anymore pieces to the puzzle :/");
         }
 
         private void PuzzleSolverWorker_ProgressChanged(object sender, ProgressChangedEventArgs e) {
-            LOGGER.Debug("Solving ... {percentage}%", e.ProgressPercentage);
+            this.UpdateMasterView();
         }
 
         private void PuzzleSolverWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e) {
-            PicBoxMaster.Image = RenderFullBitmapFromPuzzle(this.masterPuzzle);
+            this.UpdateMasterView();
+        }
+
+        // master modification
+
+        private static void AddPieceToPuzzle(int puzzleX, int puzzleY, PuzzlePiece piece, Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle, HashSet<PuzzlePiece> usedPieces) {
+            lock (masterLock) {
+                if (!puzzle.ContainsKey(puzzleX)) {
+                    puzzle.Add(puzzleX, new Dictionary<int, PuzzlePiece>());
+                }
+                if (!puzzle[puzzleX].ContainsKey(puzzleY)) {
+                    usedPieces.Add(piece);
+                    puzzle[puzzleX].Add(puzzleY, piece);
+                }
+                else {
+                    throw new InvalidOperationException("There is already a puzzle piece at position " + puzzleX + ":" + puzzleY);
+                }
+            }
+        }
+
+        private static void RemovePieceFromPuzzle(int puzzleX, int puzzleY, Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle, HashSet<PuzzlePiece> usedPieces) {
+            if (puzzle.ContainsKey(puzzleX) && puzzle[puzzleX].ContainsKey(puzzleY)) {
+                lock (masterLock) {
+                    usedPieces.Remove(puzzle[puzzleX][puzzleY]);
+                    puzzle[puzzleX].Remove(puzzleY);
+                }
+            }
+        }
+
+        private static void RemovePieceFromPuzzle(PuzzlePiece piece, Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle, HashSet<PuzzlePiece> usedPieces) {
+            Point pieceCoordinates = DeterminePieceCoordinatesFromPiece(piece, puzzle);
+            lock (masterLock) {
+                puzzle[pieceCoordinates.X].Remove(pieceCoordinates.Y);
+                usedPieces.Remove(piece);
+            }
         }
 
         // helpers
@@ -367,29 +422,42 @@ namespace ShreddedAndScrambled {
         }
 
         private static Bitmap RenderFullBitmapFromPuzzle(Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle) {
-            Tuple<int, int, int, int> borders = DetermineMinMaxCoordinates(puzzle);
+            lock (masterLock) {
+                Tuple<int, int, int, int> borders = DetermineMinMaxCoordinates(puzzle);
 
-            // create empty image (of correct size)
-            Bitmap output = new Bitmap((borders.Item2 - borders.Item1 + 1) * (PuzzlePiece.DATA_WIDTH - 2 * PuzzlePiece.BIT_LENGTH) + 2 * PuzzlePiece.BIT_LENGTH,
-                (borders.Item4 - borders.Item3 + 1) * (PuzzlePiece.DATA_HEIGHT - 2 * PuzzlePiece.BIT_LENGTH) + 2 * PuzzlePiece.BIT_LENGTH);
-            // fill in the pieces we solved
-            foreach (KeyValuePair<int, Dictionary<int, PuzzlePiece>> col in puzzle) {
-                int normX = col.Key - borders.Item1;
-                foreach (KeyValuePair<int, PuzzlePiece> row in col.Value) {
-                    int normY = row.Key - borders.Item3;
-                    PuzzlePiece piece = row.Value;
+                // create empty image (of correct size)
+                Bitmap output = new Bitmap((borders.Item2 - borders.Item1 + 1 + 2 * RENDER_PADDING) * (PuzzlePiece.DATA_WIDTH - 2 * PuzzlePiece.BIT_LENGTH) + 2 * PuzzlePiece.BIT_LENGTH,
+                    (borders.Item4 - borders.Item3 + 1 + 2 * RENDER_PADDING) * (PuzzlePiece.DATA_HEIGHT - 2 * PuzzlePiece.BIT_LENGTH) + 2 * PuzzlePiece.BIT_LENGTH);
+                // fill in the pieces we solved
+                foreach (KeyValuePair<int, Dictionary<int, PuzzlePiece>> col in puzzle) {
+                    int normX = col.Key - borders.Item1 + RENDER_PADDING;
+                    foreach (KeyValuePair<int, PuzzlePiece> row in col.Value) {
+                        int normY = row.Key - borders.Item3 + RENDER_PADDING;
+                        PuzzlePiece piece = row.Value;
 
-                    for (int y = 0; y < PuzzlePiece.DATA_HEIGHT; y++) {
-                        for (int x = 0; x < PuzzlePiece.DATA_WIDTH; x++) {
-                            if (!piece.ImageData[x, y].IsEmpty) {
-                                output.SetPixel(normX * (PuzzlePiece.DATA_WIDTH - 2 * PuzzlePiece.BIT_LENGTH) + x, normY * (PuzzlePiece.DATA_WIDTH - 2 * PuzzlePiece.BIT_LENGTH) + y, piece.ImageData[x, y]);
+                        for (int y = 0; y < PuzzlePiece.DATA_HEIGHT; y++) {
+                            for (int x = 0; x < PuzzlePiece.DATA_WIDTH; x++) {
+                                if (!piece.ImageData[x, y].IsEmpty) {
+                                    output.SetPixel(normX * (PuzzlePiece.DATA_WIDTH - 2 * PuzzlePiece.BIT_LENGTH) + x, normY * (PuzzlePiece.DATA_WIDTH - 2 * PuzzlePiece.BIT_LENGTH) + y, piece.ImageData[x, y]);
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            return output;
+                return output;
+            }
+        }
+
+        private void UpdateMasterView() {
+            if (PicBoxMaster.InvokeRequired) {
+                PicBoxMaster.Invoke(new MethodInvoker(delegate {
+                    PicBoxMaster.Image = RenderFullBitmapFromPuzzle(this.masterPuzzle);
+                }));
+            }
+            else {
+                PicBoxMaster.Image = RenderFullBitmapFromPuzzle(this.masterPuzzle);
+            }
         }
 
         private static Bitmap RenderPreviewFromPieceCoordinates(Point pieceCoordinates, Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle) {
@@ -453,13 +521,13 @@ namespace ShreddedAndScrambled {
             }
 
             // sanity check
-            if ((imageX >= (maxX - minX + 1) * (PuzzlePiece.DATA_WIDTH - 2 * PuzzlePiece.BIT_LENGTH) + 2 * PuzzlePiece.BIT_LENGTH)
-                || (imageY >= (maxY - minY + 1) * (PuzzlePiece.DATA_HEIGHT - 2 * PuzzlePiece.BIT_LENGTH) + 2 * PuzzlePiece.BIT_LENGTH)) {
+            if ((imageX >= (maxX - minX + 1 + 2 * RENDER_PADDING) * (PuzzlePiece.DATA_WIDTH - 2 * PuzzlePiece.BIT_LENGTH) + 2 * PuzzlePiece.BIT_LENGTH)
+                || (imageY >= (maxY - minY + 1 + 2 * RENDER_PADDING) * (PuzzlePiece.DATA_HEIGHT - 2 * PuzzlePiece.BIT_LENGTH) + 2 * PuzzlePiece.BIT_LENGTH)) {
                 throw new ArgumentException("Specified coordinates not inside actual image.");
             }
 
-            int normPuzzleX = (imageX - PuzzlePiece.BIT_LENGTH) / (PuzzlePiece.DATA_WIDTH - 2 * PuzzlePiece.BIT_LENGTH) + minX;
-            int normPuzzleY = (imageY - PuzzlePiece.BIT_LENGTH) / (PuzzlePiece.DATA_HEIGHT - 2 * PuzzlePiece.BIT_LENGTH) + minY;
+            int normPuzzleX = (imageX - PuzzlePiece.BIT_LENGTH) / (PuzzlePiece.DATA_WIDTH - 2 * PuzzlePiece.BIT_LENGTH) + minX - RENDER_PADDING;
+            int normPuzzleY = (imageY - PuzzlePiece.BIT_LENGTH) / (PuzzlePiece.DATA_HEIGHT - 2 * PuzzlePiece.BIT_LENGTH) + minY - RENDER_PADDING;
 
             return new Point(normPuzzleX, normPuzzleY);
         }
@@ -467,30 +535,6 @@ namespace ShreddedAndScrambled {
         private static Point DeterminePieceCoordinatesFromPiece(PuzzlePiece piece, Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle) {
             KeyValuePair<int, Dictionary<int, PuzzlePiece>> targetColumn = puzzle.First(x => x.Value.Any(y => y.Value.Id == piece.Id));
             return new Point(targetColumn.Key, targetColumn.Value.First(x => x.Value.Id == piece.Id).Key);
-        }
-
-        private static void AddPieceToPuzzle(int puzzleX, int puzzleY, PuzzlePiece piece, Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle, HashSet<PuzzlePiece> usedPieces) {
-            if (!puzzle.ContainsKey(puzzleX)) {
-                puzzle.Add(puzzleX, new Dictionary<int, PuzzlePiece>());
-            }
-            if (!puzzle[puzzleX].ContainsKey(puzzleY)) {
-                usedPieces.Add(piece);
-                puzzle[puzzleX].Add(puzzleY, piece);
-            }
-            else {
-                throw new InvalidOperationException("There is already a puzzle piece at position " + puzzleX + ":" + puzzleY);
-            }
-        }
-
-        private static void RemovePieceFromPuzzle(int x, int y, PuzzlePiece piece, Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle, HashSet<PuzzlePiece> usedPieces) {
-            puzzle[x].Remove(y);
-            usedPieces.Remove(piece);
-        }
-
-        private static void RemovePieceFromPuzzle(PuzzlePiece piece, Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle, HashSet<PuzzlePiece> usedPieces) {
-            Point pieceCoordinates = DeterminePieceCoordinatesFromPiece(piece, puzzle);
-            puzzle[pieceCoordinates.X].Remove(pieceCoordinates.Y);
-            usedPieces.Remove(piece);
         }
 
         private static HashSet<Tuple<int, int>> GetMissingNeighbors(int x, int y, Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle) {
@@ -585,6 +629,8 @@ namespace ShreddedAndScrambled {
             PictureBox pictureBox = sender as PictureBox;
             MouseEventArgs mouseEventArgs = e as MouseEventArgs;
 
+            this.interruptSolver = true;
+
             // determine coordinates in picture
             txtBoxLog.AppendText("PicBoxRel " + mouseEventArgs.Location.ToString() + Environment.NewLine);
             Point imageCoordinates = GetImageCoordinatesFromPictureBoxClick(pictureBox, mouseEventArgs.X, mouseEventArgs.Y);
@@ -592,6 +638,7 @@ namespace ShreddedAndScrambled {
 
             // calculate piece in picture
             Point puzzleCoords = DeterminePuzzleCoordinatesFromBitmapCoordinate(imageCoordinates.X, imageCoordinates.Y, this.masterPuzzle);
+            txtBoxLog.AppendText("PuzzleC " + puzzleCoords + Environment.NewLine);
             PuzzlePiece clickedPiece = (this.masterPuzzle.ContainsKey(puzzleCoords.X) && this.masterPuzzle[puzzleCoords.X].ContainsKey(puzzleCoords.Y)) ? this.masterPuzzle[puzzleCoords.X][puzzleCoords.Y] : null;
             txtBoxLog.AppendText("Piece #" + clickedPiece + Environment.NewLine);
 
@@ -612,6 +659,10 @@ namespace ShreddedAndScrambled {
                 ListViewPieceSelection.Items.Clear();
 
                 Dictionary<Direction, byte> surroundingEdges = GetSurroundingEdges(puzzleCoords.X, puzzleCoords.Y, this.masterPuzzle);
+                if (surroundingEdges.Count == 0) {
+                    this.LogWithBox(LogLevel.Info, "Clicked empty, random part of picture.");
+                    return;
+                }
                 List<PuzzlePiece> physicallyFittingPieces = GetPhysicallyFittingPieces(surroundingEdges, PIECE_DATA, this.piecesUsedInMaster).ToList();
 
                 List<Tuple<PuzzlePiece, int>> ratedFittingPieces = new List<Tuple<PuzzlePiece, int>>();
@@ -630,20 +681,24 @@ namespace ShreddedAndScrambled {
                 }
 
                 ListViewPieceSelection.EndUpdate();
+                ListViewPieceSelection.Refresh();
             }
 
             // right-click remove piece
             if ((clickedPiece != null) && (mouseEventArgs.Button == MouseButtons.Right)) {
                 RemovePieceFromPuzzle(clickedPiece, this.masterPuzzle, this.piecesUsedInMaster);
-                pictureBox.Image = RenderFullBitmapFromPuzzle(this.masterPuzzle);
+                this.UpdateMasterView();
+                this.puzzleSelectionEmpty = true;
             }
         }
 
         private void ListViewPieceSelection_DoubleClick(object sender, EventArgs e) {
             ListView pieceSelection = sender as ListView;
             if (this.puzzleSelectionEmpty) {
+                // just to be sure .. remove the old piece
+                RemovePieceFromPuzzle(this.puzzleSelectionCoords.X, this.puzzleSelectionCoords.Y, this.masterPuzzle, this.piecesUsedInMaster);
                 AddPieceToPuzzle(this.puzzleSelectionCoords.X, this.puzzleSelectionCoords.Y, pieceSelection.SelectedItems[0].Tag as PuzzlePiece, this.masterPuzzle, this.piecesUsedInMaster);
-                PicBoxMaster.Image = RenderFullBitmapFromPuzzle(this.masterPuzzle);
+                this.UpdateMasterView();
             }
         }
 
@@ -711,6 +766,7 @@ namespace ShreddedAndScrambled {
             IEnumerable<Tuple<int, int, PuzzlePiece>> overlappingPieces = subPieces.Where(x => masterPieces.Any(y => (y.Item3.Id == x.Item3.Id)) || masterEmpty);
 
             // either the master is empty or a properly overlapping pieces has been found
+            int MASTER_ADD_MIN_MATCH_COUNT = 5;
             if (masterEmpty || (overlappingPieces.Count() >= MASTER_ADD_MIN_MATCH_COUNT)) {
                 Dictionary<PuzzlePiece, Tuple<int, int>> masterCoordinates = new Dictionary<PuzzlePiece, Tuple<int, int>>(masterPieces.Select(x => new KeyValuePair<PuzzlePiece, Tuple<int, int>>(x.Item3, new Tuple<int, int>(x.Item1, x.Item2))));
                 Dictionary<PuzzlePiece, Tuple<int, int>> subCoordinates = new Dictionary<PuzzlePiece, Tuple<int, int>>(subPieces.Select(x => new KeyValuePair<PuzzlePiece, Tuple<int, int>>(x.Item3, new Tuple<int, int>(x.Item1, x.Item2))));
@@ -750,13 +806,44 @@ namespace ShreddedAndScrambled {
                     // piece exists in master AND is different; delete from master
                     else {
                         if (this.masterPuzzle[piece.Item1 + properOffset.Item1][piece.Item2 + properOffset.Item2].Id != piece.Item3.Id) {
-                            RemovePieceFromPuzzle(piece.Item1 + properOffset.Item1, piece.Item2 + properOffset.Item2, piece.Item3, this.masterPuzzle, this.piecesUsedInMaster);
+                            RemovePieceFromPuzzle(piece.Item1 + properOffset.Item1, piece.Item2 + properOffset.Item2, this.masterPuzzle, this.piecesUsedInMaster);
                         }
                     }
                 }
                 return true;
             }
             return false;
+        }
+
+        private void PicBoxMaster_MouseDown(object sender, MouseEventArgs e) {
+            PictureBox pictureBox = sender as PictureBox;
+
+            if (e.Button == MouseButtons.Right) {
+                Point imageCoords = GetImageCoordinatesFromPictureBoxClick(pictureBox, e.X, e.Y);
+                this.deleteMouseDown = DeterminePuzzleCoordinatesFromBitmapCoordinate(imageCoords.X, imageCoords.Y, this.masterPuzzle);
+            }
+        }
+
+        private void PicBoxMaster_MouseUp(object sender, MouseEventArgs e) {
+            PictureBox pictureBox = sender as PictureBox;
+
+            if (e.Button == MouseButtons.Right) {
+                Point imageCoords = GetImageCoordinatesFromPictureBoxClick(pictureBox, e.X, e.Y);
+                this.deleteMouseUp = DeterminePuzzleCoordinatesFromBitmapCoordinate(imageCoords.X, imageCoords.Y, this.masterPuzzle);
+
+                int minX = Math.Min(this.deleteMouseDown.X, this.deleteMouseUp.X);
+                int maxX = Math.Max(this.deleteMouseDown.X, this.deleteMouseUp.X);
+                int minY = Math.Min(this.deleteMouseDown.Y, this.deleteMouseUp.Y);
+                int maxY = Math.Max(this.deleteMouseDown.Y, this.deleteMouseUp.Y);
+
+                for (int y = minY; y <= maxY; y++) {
+                    for (int x = minX; x <= maxX; x++) {
+                        RemovePieceFromPuzzle(x, y, this.masterPuzzle, this.piecesUsedInMaster);
+                    }
+                }
+
+                this.UpdateMasterView();
+            }
         }
 
     }
