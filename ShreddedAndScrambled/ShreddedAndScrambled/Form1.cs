@@ -16,36 +16,49 @@ namespace ShreddedAndScrambled {
 
         private void LogWithBox(LogLevel level, string message, params object[] args) {
             if ((level == LogLevel.Info) || (level == LogLevel.Warn) || (level == LogLevel.Error)) {
-                txtBoxLog.AppendText(string.Format(message, args) + Environment.NewLine);
+                if (txtBoxLog.InvokeRequired) {
+                    txtBoxLog.Invoke(new MethodInvoker(delegate { txtBoxLog.AppendText(string.Format(message, args) + Environment.NewLine); }));
+                }
+                else {
+                    txtBoxLog.AppendText(string.Format(message, args) + Environment.NewLine);
+                }
             }
             LOGGER.Log(level, message, args);
         }
 
         //private const string PIECE_DIRECTORY = @"C:\Users\rkrausse\Downloads\ManyPieces";
-        //private const string PIECE_DIRECTORY = @"C:\Users\rkrausse\Downloads\Pieces";
+        private const string PIECE_DIRECTORY = @"C:\Users\rkrausse\Downloads\Pieces";
         //private const string PIECE_DIRECTORY = @"E:\Yes-Man\Downloads\ManyPieces";
-        private const string PIECE_DIRECTORY = @"E:\Yes-Man\Downloads\Pieces";
+        //private const string PIECE_DIRECTORY = @"E:\Yes-Man\Downloads\Pieces";
 
         private const double DISTANCE_FACTOR_2ND_PLACE = 1.5;
         private const int DISTANCE_THRESHOLD = 1000;
         private const int MASTER_ADD_MIN_MATCH_COUNT = 5;
+        private const double DISTANCE_TOP_FACTOR = 0.01;
+        private const int IMAGE_LIST_ZOOM_FACTOR = 4;
+
+        private static readonly Dictionary<Direction, Dictionary<byte, HashSet<PuzzlePiece>>> COUNTER_EDGE_MAP = new Dictionary<Direction, Dictionary<byte, HashSet<PuzzlePiece>>>();
+        private static readonly List<PuzzlePiece> PIECE_DATA = new List<PuzzlePiece>();
+
+        private readonly Dictionary<int, Dictionary<int, PuzzlePiece>> masterPuzzle = new Dictionary<int, Dictionary<int, PuzzlePiece>>();
+        private readonly HashSet<PuzzlePiece> piecesUsedInMaster = new HashSet<PuzzlePiece>();
+        private readonly ImageList pieceSelectionImageList = new ImageList();
 
         private BackgroundWorker imageAnalysisWorker;
         private BackgroundWorker crossAnalysisWorker;
         private BackgroundWorker puzzleSolverWorker;
 
-        private readonly List<PuzzlePiece> pieceData = new List<PuzzlePiece>();
-        private readonly Dictionary<Direction, Dictionary<byte, HashSet<PuzzlePiece>>> counterEdgeMap = new Dictionary<Direction, Dictionary<byte, HashSet<PuzzlePiece>>>();
-        private readonly HashSet<Dictionary<int, Dictionary<int, PuzzlePiece>>> freeFloatingSubPuzzles = new HashSet<Dictionary<int, Dictionary<int, PuzzlePiece>>>();
-        private readonly Dictionary<int, Dictionary<int, PuzzlePiece>> masterPuzzle = new Dictionary<int, Dictionary<int, PuzzlePiece>>();
-        private readonly HashSet<PuzzlePiece> piecesUsedInMaster = new HashSet<PuzzlePiece>();
-
-        private readonly Random prng = new Random();
-
-        private string runId;
+        private Point puzzleSelectionCoords;
+        private bool puzzleSelectionEmpty;
 
         public Form1() {
             InitializeComponent();
+
+            this.pieceSelectionImageList.ColorDepth = ColorDepth.Depth24Bit;
+            this.pieceSelectionImageList.ImageSize = new Size(PuzzlePiece.DATA_WIDTH * IMAGE_LIST_ZOOM_FACTOR, PuzzlePiece.DATA_HEIGHT * IMAGE_LIST_ZOOM_FACTOR);
+            this.pieceSelectionImageList.TransparentColor = Color.Empty;
+
+            this.ListViewPieceSelection.LargeImageList = this.pieceSelectionImageList;
         }
 
         public override string ToString() {
@@ -54,15 +67,13 @@ namespace ShreddedAndScrambled {
 
         private void Run_Click(object sender, EventArgs e) {
             txtBoxLog.Clear();
-            this.runId = Guid.NewGuid().ToString().Substring(0, 8);
 
-            if (this.pieceData.Count == 0) {
+            if (PIECE_DATA.Count == 0) {
                 this.RunImageFileAnalysis();
             }
-            else {
-                this.RunCrossImageAnalysis();
-            }
         }
+
+        // initial analysis
 
         private void RunImageFileAnalysis() {
             this.imageAnalysisWorker = new BackgroundWorker();
@@ -70,7 +81,7 @@ namespace ShreddedAndScrambled {
             this.imageAnalysisWorker.ProgressChanged += this.ImageAnalysisWorker_ProgressChanged;
             this.imageAnalysisWorker.RunWorkerCompleted += this.ImageAnalysisWorker_RunWorkerCompleted;
             this.imageAnalysisWorker.WorkerReportsProgress = true;
-            this.imageAnalysisWorker.RunWorkerAsync(this.pieceData);
+            this.imageAnalysisWorker.RunWorkerAsync();
         }
 
         private void ImageAnalysisWorker_DoWork(object sender, DoWorkEventArgs e) {
@@ -82,39 +93,39 @@ namespace ShreddedAndScrambled {
             int maxCounter = pieces.Length;
 
             // prepare counter edge map
-            this.counterEdgeMap.Clear();
-            this.counterEdgeMap.Add(Direction.NORTH, new Dictionary<byte, HashSet<PuzzlePiece>>());
-            this.counterEdgeMap.Add(Direction.SOUTH, new Dictionary<byte, HashSet<PuzzlePiece>>());
-            this.counterEdgeMap.Add(Direction.EAST, new Dictionary<byte, HashSet<PuzzlePiece>>());
-            this.counterEdgeMap.Add(Direction.WEST, new Dictionary<byte, HashSet<PuzzlePiece>>());
+            COUNTER_EDGE_MAP.Clear();
+            COUNTER_EDGE_MAP.Add(Direction.NORTH, new Dictionary<byte, HashSet<PuzzlePiece>>());
+            COUNTER_EDGE_MAP.Add(Direction.SOUTH, new Dictionary<byte, HashSet<PuzzlePiece>>());
+            COUNTER_EDGE_MAP.Add(Direction.EAST, new Dictionary<byte, HashSet<PuzzlePiece>>());
+            COUNTER_EDGE_MAP.Add(Direction.WEST, new Dictionary<byte, HashSet<PuzzlePiece>>());
             for (byte i = 0; i <= PuzzlePiece.EDGE_MATCH_BYTE; i++) {
-                this.counterEdgeMap[Direction.NORTH].Add(i, new HashSet<PuzzlePiece>());
-                this.counterEdgeMap[Direction.SOUTH].Add(i, new HashSet<PuzzlePiece>());
-                this.counterEdgeMap[Direction.EAST].Add(i, new HashSet<PuzzlePiece>());
-                this.counterEdgeMap[Direction.WEST].Add(i, new HashSet<PuzzlePiece>());
+                COUNTER_EDGE_MAP[Direction.NORTH].Add(i, new HashSet<PuzzlePiece>());
+                COUNTER_EDGE_MAP[Direction.SOUTH].Add(i, new HashSet<PuzzlePiece>());
+                COUNTER_EDGE_MAP[Direction.EAST].Add(i, new HashSet<PuzzlePiece>());
+                COUNTER_EDGE_MAP[Direction.WEST].Add(i, new HashSet<PuzzlePiece>());
             }
 
             foreach (string fileLocation in pieces) {
                 PuzzlePiece piece = new PuzzlePiece(fileLocation);
-                this.pieceData.Add(piece);
+                PIECE_DATA.Add(piece);
 
                 // fill edge map
                 if (!piece.PuzzleEdges.Contains(Direction.NORTH)) {
-                    this.counterEdgeMap[Direction.NORTH][PuzzlePiece.InvertEdge(piece.NorthEdge)].Add(piece);
+                    COUNTER_EDGE_MAP[Direction.NORTH][PuzzlePiece.InvertEdge(piece.NorthEdge)].Add(piece);
                 }
                 if (!piece.PuzzleEdges.Contains(Direction.SOUTH)) {
-                    this.counterEdgeMap[Direction.SOUTH][PuzzlePiece.InvertEdge(piece.SouthEdge)].Add(piece);
+                    COUNTER_EDGE_MAP[Direction.SOUTH][PuzzlePiece.InvertEdge(piece.SouthEdge)].Add(piece);
                 }
                 if (!piece.PuzzleEdges.Contains(Direction.EAST)) {
-                    this.counterEdgeMap[Direction.EAST][PuzzlePiece.InvertEdge(piece.EastEdge)].Add(piece);
+                    COUNTER_EDGE_MAP[Direction.EAST][PuzzlePiece.InvertEdge(piece.EastEdge)].Add(piece);
                 }
                 if (!piece.PuzzleEdges.Contains(Direction.WEST)) {
-                    this.counterEdgeMap[Direction.WEST][PuzzlePiece.InvertEdge(piece.WestEdge)].Add(piece);
+                    COUNTER_EDGE_MAP[Direction.WEST][PuzzlePiece.InvertEdge(piece.WestEdge)].Add(piece);
                 }
 
                 counter++;
                 if (Math.Floor((double)counter * 100 / maxCounter) > percentage) {
-                    if (percentage > 0 && percentage % 10 == 0) {
+                    if (percentage % 10 == 0) {
                         worker.ReportProgress(percentage);
                     }
                     percentage++;
@@ -123,13 +134,15 @@ namespace ShreddedAndScrambled {
         }
 
         private void ImageAnalysisWorker_ProgressChanged(object sender, ProgressChangedEventArgs e) {
-            this.LogWithBox(LogLevel.Info, "Completed {0}% of file read job.", e.ProgressPercentage);
+            string msg = "Completed " + e.ProgressPercentage + "% of file read job.";
+            LOGGER.Info(msg);
+            txtBoxLog.AppendText(msg + Environment.NewLine);
         }
 
         private void ImageAnalysisWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e) {
             this.LogWithBox(LogLevel.Info, "Initial analysis done!");
 
-            foreach (KeyValuePair<Direction, Dictionary<byte, HashSet<PuzzlePiece>>> direction in this.counterEdgeMap) {
+            foreach (KeyValuePair<Direction, Dictionary<byte, HashSet<PuzzlePiece>>> direction in COUNTER_EDGE_MAP) {
                 int dirMin = int.MaxValue;
                 int dirMax = int.MinValue;
                 foreach (KeyValuePair<byte, HashSet<PuzzlePiece>> edge in direction.Value) {
@@ -145,7 +158,7 @@ namespace ShreddedAndScrambled {
                 this.LogWithBox(LogLevel.Info, "{0} {1}-{2}", direction.Key, dirMin, dirMax);
             }
 
-            if (!this.pieceData.Any(x => x.PuzzleEdges.Count != 0)) {
+            if (!PIECE_DATA.Any(x => x.PuzzleEdges.Count != 0)) {
                 this.LogWithBox(LogLevel.Info, "Found NO edges or corners!");
             }
 
@@ -153,26 +166,80 @@ namespace ShreddedAndScrambled {
             this.RunCrossImageAnalysis();
         }
 
+        // advanced analysis
+
         private void RunCrossImageAnalysis() {
             this.crossAnalysisWorker = new BackgroundWorker();
             this.crossAnalysisWorker.DoWork += this.CrossAnalysisWorker_DoWork;
             this.crossAnalysisWorker.ProgressChanged += this.CrossAnalysisWorker_ProgressChanged;
             this.crossAnalysisWorker.RunWorkerCompleted += this.CrossAnalysisWorker_RunWorkerCompleted;
             this.crossAnalysisWorker.WorkerReportsProgress = true;
-            this.crossAnalysisWorker.RunWorkerAsync(this.pieceData);
+            this.crossAnalysisWorker.RunWorkerAsync();
         }
 
         private void CrossAnalysisWorker_DoWork(object sender, DoWorkEventArgs e) {
+            BackgroundWorker worker = sender as BackgroundWorker;
+
+            // analyse all edges in order to find sensible thresholds
+            int overallDistances = 0;
+            int numberOfDonePieces = 0;
+            int numberOfPieces = PIECE_DATA.Count;
+            int percentageDone = -1;
+            HashSet<int> masterDistances = new HashSet<int>();
+
+            foreach (PuzzlePiece piece in PIECE_DATA) {
+                HashSet<int> pieceDistances = new HashSet<int>();
+                // north
+                if (!piece.PuzzleEdges.Contains(Direction.NORTH)) {
+                    foreach (PuzzlePiece counterPart in COUNTER_EDGE_MAP[Direction.SOUTH][piece.NorthEdge]) {
+                        pieceDistances.Add(PuzzlePiece.GetPieceEdgeDistance(piece, counterPart, Direction.NORTH));
+                    }
+                }
+                // south
+                if (!piece.PuzzleEdges.Contains(Direction.SOUTH)) {
+                    foreach (PuzzlePiece counterPart in COUNTER_EDGE_MAP[Direction.NORTH][piece.SouthEdge]) {
+                        pieceDistances.Add(PuzzlePiece.GetPieceEdgeDistance(piece, counterPart, Direction.SOUTH));
+                    }
+                }
+                // east
+                if (!piece.PuzzleEdges.Contains(Direction.EAST)) {
+                    foreach (PuzzlePiece counterPart in COUNTER_EDGE_MAP[Direction.WEST][piece.EastEdge]) {
+                        pieceDistances.Add(PuzzlePiece.GetPieceEdgeDistance(piece, counterPart, Direction.EAST));
+                    }
+                }
+                // west
+                if (!piece.PuzzleEdges.Contains(Direction.WEST)) {
+                    foreach (PuzzlePiece counterPart in COUNTER_EDGE_MAP[Direction.EAST][piece.WestEdge]) {
+                        pieceDistances.Add(PuzzlePiece.GetPieceEdgeDistance(piece, counterPart, Direction.WEST));
+                    }
+                }
+                overallDistances += pieceDistances.Count;
+                int maxTopDistance = pieceDistances.OrderBy(x => x).Take((int)(DISTANCE_TOP_FACTOR * pieceDistances.Count)).Last();
+                masterDistances.Add(maxTopDistance);
+
+                numberOfDonePieces++;
+                if (Math.Floor((double)numberOfDonePieces * 100 / numberOfPieces) > percentageDone) {
+                    if (percentageDone % 10 == 0) {
+                        worker.ReportProgress(percentageDone);
+                    }
+                    percentageDone++;
+                }
+            }
+
+            int dynamicDistance = (int)masterDistances.Average();
+            this.LogWithBox(LogLevel.Info, "Calculated a dynamic distance of {0} (using {1} individual piece distances from {2} pieces).", dynamicDistance, overallDistances, numberOfPieces);
         }
 
         private void CrossAnalysisWorker_ProgressChanged(object sender, ProgressChangedEventArgs e) {
-            LOGGER.Debug("Completed {percentage}% of cross-image analysis.", e.ProgressPercentage);
+            this.LogWithBox(LogLevel.Info, "Completed {0}% of cross-image analysis.", e.ProgressPercentage);
         }
 
         private void CrossAnalysisWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e) {
             LOGGER.Debug("Cross-image analysis done.");
             this.RunPuzzleSolver();
         }
+
+        // solving the puzzle
 
         private void RunPuzzleSolver() {
             this.puzzleSolverWorker = new BackgroundWorker();
@@ -184,7 +251,7 @@ namespace ShreddedAndScrambled {
         }
 
         private void PuzzleSolverWorker_DoWork(object sender, DoWorkEventArgs e) {
-            AddPieceToPuzzle(0, 0, this.pieceData.Find(x => x.PuzzleEdges.Contains(Direction.NORTH) && x.PuzzleEdges.Contains(Direction.WEST)), this.masterPuzzle, this.piecesUsedInMaster);
+            AddPieceToPuzzle(0, 0, PIECE_DATA.Find(x => x.PuzzleEdges.Contains(Direction.SOUTH) && x.PuzzleEdges.Contains(Direction.WEST)), this.masterPuzzle, this.piecesUsedInMaster);
             //AddPieceToPuzzle(0, 0, this.pieceData.Find(x => x.Filename.EndsWith("3FED7F1.png")), finishedSubPuzzle, usedPieces);
             //AddPieceToPuzzle(0, 0, this.pieceData[this.prng.Next(this.pieceData.Count)], finishedSubPuzzle, usedPieces);
 
@@ -208,19 +275,11 @@ namespace ShreddedAndScrambled {
                             MissingPiece missingPiece = new MissingPiece {
                                 X = emptySpot.Item1,
                                 Y = emptySpot.Item2,
-                                Edges = GetSurroundingEdges(emptySpot.Item1, emptySpot.Item2, this.masterPuzzle)
+                                Edges = new Dictionary<Direction, byte>(GetSurroundingPieces(emptySpot.Item1, emptySpot.Item2, this.masterPuzzle).Select(x => new KeyValuePair<Direction, byte>(x.Key, GetCounterEdgeFromPiece(x.Value, x.Key))))
                             };
-                            // all physically matching pieces (that were not already used)
-                            IEnumerable<PuzzlePiece> physicalMatches = this.pieceData.Where(x =>
-                                !this.piecesUsedInMaster.Contains(x) &&
-                                (!missingPiece.Edges.ContainsKey(Direction.NORTH) || this.counterEdgeMap[Direction.NORTH][missingPiece.Edges[Direction.NORTH]].Contains(x)) &&
-                                (!missingPiece.Edges.ContainsKey(Direction.SOUTH) || this.counterEdgeMap[Direction.SOUTH][missingPiece.Edges[Direction.SOUTH]].Contains(x)) &&
-                                (!missingPiece.Edges.ContainsKey(Direction.EAST) || this.counterEdgeMap[Direction.EAST][missingPiece.Edges[Direction.EAST]].Contains(x)) &&
-                                (!missingPiece.Edges.ContainsKey(Direction.WEST) || this.counterEdgeMap[Direction.WEST][missingPiece.Edges[Direction.WEST]].Contains(x))
-                            );
-                            // plus their optical match
+                            // all physically matching pieces (that were not already used) plus their optical match
                             List<Tuple<PuzzlePiece, int>> sortedMatches = new List<Tuple<PuzzlePiece, int>>();
-                            foreach (PuzzlePiece physicallyMatchingPiece in physicalMatches) {
+                            foreach (PuzzlePiece physicallyMatchingPiece in GetPhysicallyFittingPieces(missingPiece.Edges, PIECE_DATA, this.piecesUsedInMaster)) {
                                 int opticalDistance = 0;
                                 if (missingPiece.Edges.ContainsKey(Direction.NORTH)) {
                                     opticalDistance += PuzzlePiece.GetPieceEdgeDistance(physicallyMatchingPiece, this.masterPuzzle[emptySpot.Item1][emptySpot.Item2 - 1], Direction.NORTH);
@@ -264,7 +323,7 @@ namespace ShreddedAndScrambled {
 
                 // add the good matches to the scene
                 foreach (MissingPiece missing in missingNeighboringPieces) {
-                    if ((missing.MatchingPieces.Count == 0) && (this.piecesUsedInMaster.Count != this.pieceData.Count)) {
+                    if ((missing.MatchingPieces.Count == 0) && (this.piecesUsedInMaster.Count != PIECE_DATA.Count)) {
                         LOGGER.Debug("Couldn't find any more matching pieces.");
                         return;
                     }
@@ -286,8 +345,362 @@ namespace ShreddedAndScrambled {
         }
 
         private void PuzzleSolverWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e) {
-            PicBoxMaster.Image = GenerateBitmapFromPuzzle(this.masterPuzzle);
+            PicBoxMaster.Image = RenderFullBitmapFromPuzzle(this.masterPuzzle);
         }
+
+        // helpers
+
+        private static Tuple<int, int, int, int> DetermineMinMaxCoordinates(Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle) {
+            int minX = int.MaxValue;
+            int maxX = int.MinValue;
+            int minY = int.MaxValue;
+            int maxY = int.MinValue;
+            foreach (KeyValuePair<int, Dictionary<int, PuzzlePiece>> finishedColumn in puzzle) {
+                minX = Math.Min(minX, finishedColumn.Key);
+                maxX = Math.Max(maxX, finishedColumn.Key);
+                foreach (KeyValuePair<int, PuzzlePiece> finishedRow in finishedColumn.Value) {
+                    minY = Math.Min(minY, finishedRow.Key);
+                    maxY = Math.Max(maxY, finishedRow.Key);
+                }
+            }
+            return new Tuple<int, int, int, int>(minX, maxX, minY, maxY);
+        }
+
+        private static Bitmap RenderFullBitmapFromPuzzle(Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle) {
+            Tuple<int, int, int, int> borders = DetermineMinMaxCoordinates(puzzle);
+
+            // create empty image (of correct size)
+            Bitmap output = new Bitmap((borders.Item2 - borders.Item1 + 1) * (PuzzlePiece.DATA_WIDTH - 2 * PuzzlePiece.BIT_LENGTH) + 2 * PuzzlePiece.BIT_LENGTH,
+                (borders.Item4 - borders.Item3 + 1) * (PuzzlePiece.DATA_HEIGHT - 2 * PuzzlePiece.BIT_LENGTH) + 2 * PuzzlePiece.BIT_LENGTH);
+            // fill in the pieces we solved
+            foreach (KeyValuePair<int, Dictionary<int, PuzzlePiece>> col in puzzle) {
+                int normX = col.Key - borders.Item1;
+                foreach (KeyValuePair<int, PuzzlePiece> row in col.Value) {
+                    int normY = row.Key - borders.Item3;
+                    PuzzlePiece piece = row.Value;
+
+                    for (int y = 0; y < PuzzlePiece.DATA_HEIGHT; y++) {
+                        for (int x = 0; x < PuzzlePiece.DATA_WIDTH; x++) {
+                            if (!piece.ImageData[x, y].IsEmpty) {
+                                output.SetPixel(normX * (PuzzlePiece.DATA_WIDTH - 2 * PuzzlePiece.BIT_LENGTH) + x, normY * (PuzzlePiece.DATA_WIDTH - 2 * PuzzlePiece.BIT_LENGTH) + y, piece.ImageData[x, y]);
+                            }
+                        }
+                    }
+                }
+            }
+
+            return output;
+        }
+
+        private static Bitmap RenderPreviewFromPieceCoordinates(Point pieceCoordinates, Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle) {
+            Bitmap bitmap = new Bitmap(3 * (PuzzlePiece.DATA_WIDTH - 2 * PuzzlePiece.BIT_LENGTH) + 2 * PuzzlePiece.BIT_LENGTH,
+                3 * (PuzzlePiece.DATA_HEIGHT - 2 * PuzzlePiece.BIT_LENGTH) + 2 * PuzzlePiece.BIT_LENGTH);
+            for (int puzzleY = 0; puzzleY < 3; puzzleY++) {
+                for (int puzzleX = 0; puzzleX < 3; puzzleX++) {
+                    if (puzzle.ContainsKey(pieceCoordinates.X + puzzleX - 1) && puzzle[pieceCoordinates.X + puzzleX - 1].ContainsKey(pieceCoordinates.Y + puzzleY - 1)) {
+                        PuzzlePiece currentPiece = puzzle[pieceCoordinates.X + puzzleX - 1][pieceCoordinates.Y + puzzleY - 1];
+                        for (int pieceY = 0; pieceY < PuzzlePiece.DATA_HEIGHT; pieceY++) {
+                            for (int pieceX = 0; pieceX < PuzzlePiece.DATA_WIDTH; pieceX++) {
+                                Color currentColor = currentPiece.ImageData[pieceX, pieceY];
+                                if (!currentColor.IsEmpty) {
+                                    bitmap.SetPixel(
+                                        puzzleX * (PuzzlePiece.DATA_WIDTH - 2 * PuzzlePiece.BIT_LENGTH) + pieceX,
+                                        puzzleY * (PuzzlePiece.DATA_WIDTH - 2 * PuzzlePiece.BIT_LENGTH) + pieceY,
+                                        currentColor
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return bitmap;
+        }
+
+        private static Bitmap RenderPreviewFromPiece(PuzzlePiece centerPiece, Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle) {
+            Point pieceCoordinates = DeterminePieceCoordinatesFromPiece(centerPiece, puzzle);
+            return RenderPreviewFromPieceCoordinates(pieceCoordinates, puzzle);
+        }
+
+        private static Bitmap RenderPreviewFromBitmapCoordinates(int imageX, int imageY, Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle) {
+            Point pieceCoordinates = DeterminePuzzleCoordinatesFromBitmapCoordinate(imageX, imageY, puzzle);
+            return RenderPreviewFromPieceCoordinates(pieceCoordinates, puzzle);
+        }
+
+        private static Bitmap GenerateImageFromSinglePiece(PuzzlePiece piece, int zoomFactor = 1) {
+            Bitmap bitmap = new Bitmap(PuzzlePiece.DATA_WIDTH, PuzzlePiece.DATA_HEIGHT);
+            for (int pieceY = 0; pieceY < PuzzlePiece.DATA_HEIGHT; pieceY++) {
+                for (int pieceX = 0; pieceX < PuzzlePiece.DATA_WIDTH; pieceX++) {
+                    bitmap.SetPixel(pieceX, pieceY, piece.ImageData[pieceX, pieceY]);
+                }
+            }
+            return new Bitmap(bitmap, PuzzlePiece.DATA_WIDTH * zoomFactor, PuzzlePiece.DATA_HEIGHT * zoomFactor);
+        }
+
+        private static Point DeterminePuzzleCoordinatesFromBitmapCoordinate(int imageX, int imageY, Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle) {
+            // find normalized picture coordinates
+            int minX = int.MaxValue;
+            int maxX = int.MinValue;
+            int minY = int.MaxValue;
+            int maxY = int.MinValue;
+            foreach (KeyValuePair<int, Dictionary<int, PuzzlePiece>> finishedColumn in puzzle) {
+                minX = Math.Min(minX, finishedColumn.Key);
+                maxX = Math.Max(maxX, finishedColumn.Key);
+                foreach (KeyValuePair<int, PuzzlePiece> finishedRow in finishedColumn.Value) {
+                    minY = Math.Min(minY, finishedRow.Key);
+                    maxY = Math.Max(maxY, finishedRow.Key);
+                }
+            }
+
+            // sanity check
+            if ((imageX >= (maxX - minX + 1) * (PuzzlePiece.DATA_WIDTH - 2 * PuzzlePiece.BIT_LENGTH) + 2 * PuzzlePiece.BIT_LENGTH)
+                || (imageY >= (maxY - minY + 1) * (PuzzlePiece.DATA_HEIGHT - 2 * PuzzlePiece.BIT_LENGTH) + 2 * PuzzlePiece.BIT_LENGTH)) {
+                throw new ArgumentException("Specified coordinates not inside actual image.");
+            }
+
+            int normPuzzleX = (imageX - PuzzlePiece.BIT_LENGTH) / (PuzzlePiece.DATA_WIDTH - 2 * PuzzlePiece.BIT_LENGTH) + minX;
+            int normPuzzleY = (imageY - PuzzlePiece.BIT_LENGTH) / (PuzzlePiece.DATA_HEIGHT - 2 * PuzzlePiece.BIT_LENGTH) + minY;
+
+            return new Point(normPuzzleX, normPuzzleY);
+        }
+
+        private static Point DeterminePieceCoordinatesFromPiece(PuzzlePiece piece, Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle) {
+            KeyValuePair<int, Dictionary<int, PuzzlePiece>> targetColumn = puzzle.First(x => x.Value.Any(y => y.Value.Id == piece.Id));
+            return new Point(targetColumn.Key, targetColumn.Value.First(x => x.Value.Id == piece.Id).Key);
+        }
+
+        private static void AddPieceToPuzzle(int puzzleX, int puzzleY, PuzzlePiece piece, Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle, HashSet<PuzzlePiece> usedPieces) {
+            if (!puzzle.ContainsKey(puzzleX)) {
+                puzzle.Add(puzzleX, new Dictionary<int, PuzzlePiece>());
+            }
+            if (!puzzle[puzzleX].ContainsKey(puzzleY)) {
+                usedPieces.Add(piece);
+                puzzle[puzzleX].Add(puzzleY, piece);
+            }
+            else {
+                throw new InvalidOperationException("There is already a puzzle piece at position " + puzzleX + ":" + puzzleY);
+            }
+        }
+
+        private static void RemovePieceFromPuzzle(int x, int y, PuzzlePiece piece, Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle, HashSet<PuzzlePiece> usedPieces) {
+            puzzle[x].Remove(y);
+            usedPieces.Remove(piece);
+        }
+
+        private static void RemovePieceFromPuzzle(PuzzlePiece piece, Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle, HashSet<PuzzlePiece> usedPieces) {
+            Point pieceCoordinates = DeterminePieceCoordinatesFromPiece(piece, puzzle);
+            puzzle[pieceCoordinates.X].Remove(pieceCoordinates.Y);
+            usedPieces.Remove(piece);
+        }
+
+        private static HashSet<Tuple<int, int>> GetMissingNeighbors(int x, int y, Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle) {
+            if (!puzzle.ContainsKey(x) || !puzzle[x].ContainsKey(y)) {
+                throw new InvalidOperationException("There is no piece at the given position.");
+            }
+            PuzzlePiece piece = puzzle[x][y];
+            HashSet<Tuple<int, int>> neighbors = new HashSet<Tuple<int, int>>();
+            // north
+            if (!piece.PuzzleEdges.Contains(Direction.NORTH) && (!puzzle.ContainsKey(x) || !puzzle[x].ContainsKey(y - 1))) {
+                neighbors.Add(new Tuple<int, int>(x, y - 1));
+            }
+            // south
+            if (!piece.PuzzleEdges.Contains(Direction.SOUTH) && (!puzzle.ContainsKey(x) || !puzzle[x].ContainsKey(y + 1))) {
+                neighbors.Add(new Tuple<int, int>(x, y + 1));
+            }
+            // east
+            if (!piece.PuzzleEdges.Contains(Direction.EAST) && (!puzzle.ContainsKey(x + 1) || !puzzle[x + 1].ContainsKey(y))) {
+                neighbors.Add(new Tuple<int, int>(x + 1, y));
+            }
+            // west
+            if (!piece.PuzzleEdges.Contains(Direction.WEST) && (!puzzle.ContainsKey(x - 1) || !puzzle[x - 1].ContainsKey(y))) {
+                neighbors.Add(new Tuple<int, int>(x - 1, y));
+            }
+            return neighbors;
+        }
+
+        private static byte GetCounterEdgeFromPiece(PuzzlePiece piece, Direction direction) {
+            switch (direction) {
+                case Direction.NORTH:
+                    return piece.SouthEdge;
+                case Direction.SOUTH:
+                    return piece.NorthEdge;
+                case Direction.EAST:
+                    return piece.WestEdge;
+                case Direction.WEST:
+                    return piece.EastEdge;
+                default:
+                    throw new ArgumentException("Unknown direction.");
+            }
+        }
+
+        private static Dictionary<Direction, PuzzlePiece> GetSurroundingPieces(int puzzleX, int puzzleY, Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle) {
+            Dictionary<Direction, PuzzlePiece> surroundingPieces = new Dictionary<Direction, PuzzlePiece>();
+
+            if (puzzle.ContainsKey(puzzleX) && puzzle[puzzleX].ContainsKey(puzzleY - 1)) {
+                surroundingPieces.Add(Direction.NORTH, puzzle[puzzleX][puzzleY - 1]);
+            }
+            if (puzzle.ContainsKey(puzzleX) && puzzle[puzzleX].ContainsKey(puzzleY + 1)) {
+                surroundingPieces.Add(Direction.SOUTH, puzzle[puzzleX][puzzleY + 1]);
+            }
+            if (puzzle.ContainsKey(puzzleX + 1) && puzzle[puzzleX + 1].ContainsKey(puzzleY)) {
+                surroundingPieces.Add(Direction.EAST, puzzle[puzzleX + 1][puzzleY]);
+            }
+            if (puzzle.ContainsKey(puzzleX - 1) && puzzle[puzzleX - 1].ContainsKey(puzzleY)) {
+                surroundingPieces.Add(Direction.WEST, puzzle[puzzleX - 1][puzzleY]);
+            }
+
+            return surroundingPieces;
+        }
+
+        private static Dictionary<Direction, byte> GetSurroundingEdges(int puzzleX, int puzzleY, Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle) {
+            Dictionary<Direction, byte> surroundingEdges = new Dictionary<Direction, byte>();
+
+            if (puzzle.ContainsKey(puzzleX) && puzzle[puzzleX].ContainsKey(puzzleY - 1)) {
+                surroundingEdges.Add(Direction.NORTH, puzzle[puzzleX][puzzleY - 1].SouthEdge);
+            }
+            if (puzzle.ContainsKey(puzzleX) && puzzle[puzzleX].ContainsKey(puzzleY + 1)) {
+                surroundingEdges.Add(Direction.SOUTH, puzzle[puzzleX][puzzleY + 1].NorthEdge);
+            }
+            if (puzzle.ContainsKey(puzzleX + 1) && puzzle[puzzleX + 1].ContainsKey(puzzleY)) {
+                surroundingEdges.Add(Direction.EAST, puzzle[puzzleX + 1][puzzleY].WestEdge);
+            }
+            if (puzzle.ContainsKey(puzzleX - 1) && puzzle[puzzleX - 1].ContainsKey(puzzleY)) {
+                surroundingEdges.Add(Direction.WEST, puzzle[puzzleX - 1][puzzleY].EastEdge);
+            }
+
+            return surroundingEdges;
+        }
+
+        private static IEnumerable<PuzzlePiece> GetPhysicallyFittingPieces(Dictionary<Direction, byte> surroundingEdges, IEnumerable<PuzzlePiece> availablePieces, IEnumerable<PuzzlePiece> unusablePieces) {
+            return availablePieces.Where(x =>
+                !unusablePieces.Contains(x) &&
+                (!surroundingEdges.ContainsKey(Direction.NORTH) || COUNTER_EDGE_MAP[Direction.NORTH][surroundingEdges[Direction.NORTH]].Contains(x)) &&
+                (!surroundingEdges.ContainsKey(Direction.SOUTH) || COUNTER_EDGE_MAP[Direction.SOUTH][surroundingEdges[Direction.SOUTH]].Contains(x)) &&
+                (!surroundingEdges.ContainsKey(Direction.EAST) || COUNTER_EDGE_MAP[Direction.EAST][surroundingEdges[Direction.EAST]].Contains(x)) &&
+                (!surroundingEdges.ContainsKey(Direction.WEST) || COUNTER_EDGE_MAP[Direction.WEST][surroundingEdges[Direction.WEST]].Contains(x))
+            );
+        }
+
+        private void PicBoxMaster_Click(object sender, EventArgs e) {
+            PictureBox pictureBox = sender as PictureBox;
+            MouseEventArgs mouseEventArgs = e as MouseEventArgs;
+
+            // determine coordinates in picture
+            txtBoxLog.AppendText("PicBoxRel " + mouseEventArgs.Location.ToString() + Environment.NewLine);
+            Point imageCoordinates = GetImageCoordinatesFromPictureBoxClick(pictureBox, mouseEventArgs.X, mouseEventArgs.Y);
+            txtBoxLog.AppendText("ImgRel " + (Point.Empty.Equals(imageCoordinates) ? "N/A" : imageCoordinates.ToString()) + Environment.NewLine);
+
+            // calculate piece in picture
+            Point puzzleCoords = DeterminePuzzleCoordinatesFromBitmapCoordinate(imageCoordinates.X, imageCoordinates.Y, this.masterPuzzle);
+            PuzzlePiece clickedPiece = (this.masterPuzzle.ContainsKey(puzzleCoords.X) && this.masterPuzzle[puzzleCoords.X].ContainsKey(puzzleCoords.Y)) ? this.masterPuzzle[puzzleCoords.X][puzzleCoords.Y] : null;
+            txtBoxLog.AppendText("Piece #" + clickedPiece + Environment.NewLine);
+
+            if (!Point.Empty.Equals(imageCoordinates)) {
+                this.puzzleSelectionCoords = puzzleCoords;
+                this.puzzleSelectionEmpty = clickedPiece == null;
+            }
+
+            // part of the image was (left) clicked; move selection zoom
+            if (!Point.Empty.Equals(imageCoordinates) && (mouseEventArgs.Button == MouseButtons.Left)) {
+                PicBoxSelection.Image = RenderPreviewFromBitmapCoordinates(imageCoordinates.X, imageCoordinates.Y, this.masterPuzzle);
+            }
+
+            // empty spot in image was (left) clicked; lookup matching parts and add (best ones) to list view
+            if (!Point.Empty.Equals(imageCoordinates) && (clickedPiece == null) && (mouseEventArgs.Button == MouseButtons.Left)) {
+                ListViewPieceSelection.BeginUpdate();
+                this.pieceSelectionImageList.Images.Clear();
+                ListViewPieceSelection.Items.Clear();
+
+                Dictionary<Direction, byte> surroundingEdges = GetSurroundingEdges(puzzleCoords.X, puzzleCoords.Y, this.masterPuzzle);
+                List<PuzzlePiece> physicallyFittingPieces = GetPhysicallyFittingPieces(surroundingEdges, PIECE_DATA, this.piecesUsedInMaster).ToList();
+
+                List<Tuple<PuzzlePiece, int>> ratedFittingPieces = new List<Tuple<PuzzlePiece, int>>();
+                foreach (PuzzlePiece unratedFittingPiece in physicallyFittingPieces) {
+                    int distance = PuzzlePiece.GetPieceMultiEdgeDistance(unratedFittingPiece, GetSurroundingPieces(puzzleCoords.X, puzzleCoords.Y, this.masterPuzzle));
+                    ratedFittingPieces.Add(new Tuple<PuzzlePiece, int>(unratedFittingPiece, distance));
+                }
+                ratedFittingPieces.Sort((x, y) => x.Item2.CompareTo(y.Item2));
+
+                foreach (Tuple<PuzzlePiece, int> fittingPieceWithDistance in ratedFittingPieces) {
+                    string fittingPieceId = fittingPieceWithDistance.Item1.Id.ToString();
+                    this.pieceSelectionImageList.Images.Add(fittingPieceId, GenerateImageFromSinglePiece(fittingPieceWithDistance.Item1, IMAGE_LIST_ZOOM_FACTOR));
+                    ListViewItem listViewItem = new ListViewItem("Id:" + fittingPieceId + " Dst:" + fittingPieceWithDistance.Item2, this.pieceSelectionImageList.Images.IndexOfKey(fittingPieceId));
+                    listViewItem.Tag = fittingPieceWithDistance.Item1;
+                    ListViewPieceSelection.Items.Add(listViewItem);
+                }
+
+                ListViewPieceSelection.EndUpdate();
+            }
+
+            // right-click remove piece
+            if ((clickedPiece != null) && (mouseEventArgs.Button == MouseButtons.Right)) {
+                RemovePieceFromPuzzle(clickedPiece, this.masterPuzzle, this.piecesUsedInMaster);
+                pictureBox.Image = RenderFullBitmapFromPuzzle(this.masterPuzzle);
+            }
+        }
+
+        private void ListViewPieceSelection_DoubleClick(object sender, EventArgs e) {
+            ListView pieceSelection = sender as ListView;
+            if (this.puzzleSelectionEmpty) {
+                AddPieceToPuzzle(this.puzzleSelectionCoords.X, this.puzzleSelectionCoords.Y, pieceSelection.SelectedItems[0].Tag as PuzzlePiece, this.masterPuzzle, this.piecesUsedInMaster);
+                PicBoxMaster.Image = RenderFullBitmapFromPuzzle(this.masterPuzzle);
+            }
+        }
+
+        private static Point GetImageCoordinatesFromPictureBoxClick(PictureBox pictureBox, int xBoxRelative, int yBoxRelative) {
+            if ((pictureBox == null) || (pictureBox.Image == null)) {
+                return Point.Empty;
+            }
+
+            int boxWidth = pictureBox.Width;
+            int boxHeight = pictureBox.Height;
+            int imgWidth = pictureBox.Image.Width;
+            int imgHeight = pictureBox.Image.Height;
+
+            Point possibleImageLocation;
+
+            switch (pictureBox.SizeMode) {
+                // image is centered and either padded or cropped equally
+                case PictureBoxSizeMode.CenterImage:
+                    possibleImageLocation = new Point(xBoxRelative - (boxWidth - imgWidth) / 2, yBoxRelative - (boxHeight - imgHeight) / 2);
+                    break;
+                // both axis are stretched to fit the picture box independently
+                case PictureBoxSizeMode.StretchImage:
+                    possibleImageLocation = new Point((int)((double)xBoxRelative * imgWidth / boxWidth), (int)((double)yBoxRelative * imgHeight / boxHeight));
+                    break;
+                // both axis are strechted by the same factor, depending on which one is the limiting dimension
+                case PictureBoxSizeMode.Zoom:
+                    // compare aspect ratios
+                    if ((double)imgWidth / imgHeight > (double)boxWidth / boxHeight) {
+                        // limited by width; so width is easy, height is NOT
+                        double scale = (double)boxWidth / imgWidth;
+                        possibleImageLocation = new Point((int)((double)xBoxRelative * imgWidth / boxWidth), (int)((yBoxRelative - (boxHeight - scale * imgHeight) / 2) / scale));
+                    }
+                    else {
+                        // limited by height; so height is easy, while width is NOT
+                        double scale = (double)boxHeight / imgHeight;
+                        possibleImageLocation = new Point((int)((xBoxRelative - (boxWidth - scale * imgWidth) / 2) / scale), (int)((double)yBoxRelative * imgHeight / boxHeight));
+                    }
+                    break;
+                // image is displayed in the upper left corner and not streched (in auto the control will try to adapt)
+                case PictureBoxSizeMode.Normal:
+                case PictureBoxSizeMode.AutoSize:
+                    possibleImageLocation = new Point(xBoxRelative, yBoxRelative);
+                    break;
+                default:
+                    possibleImageLocation = Point.Empty;
+                    break;
+            }
+
+            if ((possibleImageLocation.X >= 0) && (possibleImageLocation.X < imgWidth) && (possibleImageLocation.Y >= 0) && (possibleImageLocation.Y < imgHeight)) {
+                return possibleImageLocation;
+            }
+            else {
+                return Point.Empty;
+            }
+        }
+
+        // CURRENTLY UNUSED
 
         private bool TryAddPuzzleToMaster(Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle) {
             // check whether the minimum overlap does exist
@@ -344,218 +757,6 @@ namespace ShreddedAndScrambled {
                 return true;
             }
             return false;
-        }
-
-        private static Bitmap GenerateBitmapFromPuzzle(Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle) {
-            // find normalized picture coordinates
-            int minX = int.MaxValue;
-            int maxX = int.MinValue;
-            int minY = int.MaxValue;
-            int maxY = int.MinValue;
-            foreach (KeyValuePair<int, Dictionary<int, PuzzlePiece>> finishedColumn in puzzle) {
-                minX = Math.Min(minX, finishedColumn.Key);
-                maxX = Math.Max(maxX, finishedColumn.Key);
-                foreach (KeyValuePair<int, PuzzlePiece> finishedRow in finishedColumn.Value) {
-                    minY = Math.Min(minY, finishedRow.Key);
-                    maxY = Math.Max(maxY, finishedRow.Key);
-                }
-            }
-
-            // create empty image (of correct size)
-            Bitmap output = new Bitmap((maxX - minX + 1) * (PuzzlePiece.DATA_WIDTH - 2 * PuzzlePiece.BIT_LENGTH) + 2 * PuzzlePiece.BIT_LENGTH,
-                (maxY - minY + 1) * (PuzzlePiece.DATA_HEIGHT - 2 * PuzzlePiece.BIT_LENGTH) + 2 * PuzzlePiece.BIT_LENGTH);
-            // fill in the pieces we solved
-            foreach (KeyValuePair<int, Dictionary<int, PuzzlePiece>> col in puzzle) {
-                int normX = col.Key - minX;
-                foreach (KeyValuePair<int, PuzzlePiece> row in col.Value) {
-                    int normY = row.Key - minY;
-                    PuzzlePiece piece = row.Value;
-
-                    for (int y = 0; y < PuzzlePiece.DATA_HEIGHT; y++) {
-                        for (int x = 0; x < PuzzlePiece.DATA_WIDTH; x++) {
-                            if (!piece.ImageData[x, y].IsEmpty) {
-                                output.SetPixel(normX * (PuzzlePiece.DATA_WIDTH - 2 * PuzzlePiece.BIT_LENGTH) + x, normY * (PuzzlePiece.DATA_WIDTH - 2 * PuzzlePiece.BIT_LENGTH) + y, piece.ImageData[x, y]);
-                            }
-                        }
-                    }
-                }
-            }
-
-            return output;
-        }
-
-        private static PuzzlePiece DeterminePieceFromBitmapCoordinate(Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle, int imageX, int imageY) {
-            // find normalized picture coordinates
-            int minX = int.MaxValue;
-            int maxX = int.MinValue;
-            int minY = int.MaxValue;
-            int maxY = int.MinValue;
-            foreach (KeyValuePair<int, Dictionary<int, PuzzlePiece>> finishedColumn in puzzle) {
-                minX = Math.Min(minX, finishedColumn.Key);
-                maxX = Math.Max(maxX, finishedColumn.Key);
-                foreach (KeyValuePair<int, PuzzlePiece> finishedRow in finishedColumn.Value) {
-                    minY = Math.Min(minY, finishedRow.Key);
-                    maxY = Math.Max(maxY, finishedRow.Key);
-                }
-            }
-
-            // sanity check
-            if ((imageX >= (maxX - minX + 1) * (PuzzlePiece.DATA_WIDTH - 2 * PuzzlePiece.BIT_LENGTH) + 2 * PuzzlePiece.BIT_LENGTH)
-                || (imageY >= (maxY - minY + 1) * (PuzzlePiece.DATA_HEIGHT - 2 * PuzzlePiece.BIT_LENGTH) + 2 * PuzzlePiece.BIT_LENGTH)) {
-                throw new ArgumentException("Specified coordinates not inside actual image.");
-            }
-
-            int normPuzzleX = (imageX - PuzzlePiece.BIT_LENGTH) / (PuzzlePiece.DATA_WIDTH - 2 * PuzzlePiece.BIT_LENGTH) + minX;
-            int normPuzzleY = (imageY - PuzzlePiece.BIT_LENGTH) / (PuzzlePiece.DATA_HEIGHT - 2 * PuzzlePiece.BIT_LENGTH) + minY;
-
-            return (!puzzle.ContainsKey(normPuzzleX) || !puzzle[normPuzzleX].ContainsKey(normPuzzleY)) ? null : puzzle[normPuzzleX][normPuzzleY];
-        }
-
-        private static void AddPieceToPuzzle(int x, int y, PuzzlePiece piece, Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle, HashSet<PuzzlePiece> usedPieces) {
-            // if the algorithms solves the same pieces from two different directions at once...
-            if (usedPieces.Contains(piece)) {
-                return;
-            }
-
-            if (!puzzle.ContainsKey(x)) {
-                puzzle.Add(x, new Dictionary<int, PuzzlePiece>());
-            }
-            if (!puzzle[x].ContainsKey(y)) {
-                usedPieces.Add(piece);
-                puzzle[x].Add(y, piece);
-            }
-            else {
-                throw new InvalidOperationException("There is already a puzzle piece at position " + x + ":" + y);
-            }
-        }
-
-        private static void RemovePieceFromPuzzle(int x, int y, PuzzlePiece piece, Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle, HashSet<PuzzlePiece> usedPieces) {
-            puzzle[x].Remove(y);
-            usedPieces.Remove(piece);
-        }
-
-        private static void RemovePieceFromPuzzle(PuzzlePiece piece, Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle, HashSet<PuzzlePiece> usedPieces) {
-            KeyValuePair<int, Dictionary<int, PuzzlePiece>> targetColumn = puzzle.First(x => x.Value.Any(y => y.Value.Id == piece.Id));
-            int targetY = targetColumn.Value.First(x => x.Value.Id == piece.Id).Key;
-            puzzle[targetColumn.Key].Remove(targetY);
-            usedPieces.Remove(piece);
-        }
-
-        private static HashSet<Tuple<int, int>> GetMissingNeighbors(int x, int y, Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle) {
-            if (!puzzle.ContainsKey(x) || !puzzle[x].ContainsKey(y)) {
-                throw new InvalidOperationException("There is no piece at the given position.");
-            }
-            PuzzlePiece piece = puzzle[x][y];
-            HashSet<Tuple<int, int>> neighbors = new HashSet<Tuple<int, int>>();
-            // north
-            if (!piece.PuzzleEdges.Contains(Direction.NORTH) && (!puzzle.ContainsKey(x) || !puzzle[x].ContainsKey(y - 1))) {
-                neighbors.Add(new Tuple<int, int>(x, y - 1));
-            }
-            // south
-            if (!piece.PuzzleEdges.Contains(Direction.SOUTH) && (!puzzle.ContainsKey(x) || !puzzle[x].ContainsKey(y + 1))) {
-                neighbors.Add(new Tuple<int, int>(x, y + 1));
-            }
-            // east
-            if (!piece.PuzzleEdges.Contains(Direction.EAST) && (!puzzle.ContainsKey(x + 1) || !puzzle[x + 1].ContainsKey(y))) {
-                neighbors.Add(new Tuple<int, int>(x + 1, y));
-            }
-            // west
-            if (!piece.PuzzleEdges.Contains(Direction.WEST) && (!puzzle.ContainsKey(x - 1) || !puzzle[x - 1].ContainsKey(y))) {
-                neighbors.Add(new Tuple<int, int>(x - 1, y));
-            }
-            return neighbors;
-        }
-
-        private static Dictionary<Direction, byte> GetSurroundingEdges(int x, int y, Dictionary<int, Dictionary<int, PuzzlePiece>> puzzle) {
-            Dictionary<Direction, byte> surroundingEdges = new Dictionary<Direction, byte>();
-
-            if (puzzle.ContainsKey(x) && puzzle[x].ContainsKey(y - 1)) {
-                surroundingEdges.Add(Direction.NORTH, puzzle[x][y - 1].SouthEdge);
-            }
-            if (puzzle.ContainsKey(x) && puzzle[x].ContainsKey(y + 1)) {
-                surroundingEdges.Add(Direction.SOUTH, puzzle[x][y + 1].NorthEdge);
-            }
-            if (puzzle.ContainsKey(x + 1) && puzzle[x + 1].ContainsKey(y)) {
-                surroundingEdges.Add(Direction.EAST, puzzle[x + 1][y].WestEdge);
-            }
-            if (puzzle.ContainsKey(x - 1) && puzzle[x - 1].ContainsKey(y)) {
-                surroundingEdges.Add(Direction.WEST, puzzle[x - 1][y].EastEdge);
-            }
-
-            return surroundingEdges;
-        }
-
-        private void PicBoxMaster_Click(object sender, EventArgs e) {
-            PictureBox pictureBox = sender as PictureBox;
-            MouseEventArgs mouseEventArgs = e as MouseEventArgs;
-
-            // determine coordinates in picture
-            txtBoxLog.AppendText("PicBoxRel " + mouseEventArgs.Location.ToString() + Environment.NewLine);
-            Point imageCoordinates = GetImageCoordinatesFromPictureBoxClick(pictureBox, mouseEventArgs.X, mouseEventArgs.Y);
-            txtBoxLog.AppendText("ImgRel " + (Point.Empty.Equals(imageCoordinates) ? "N/A" : imageCoordinates.ToString()) + Environment.NewLine);
-
-            // calculate piece in picture
-            PuzzlePiece clickedPiece = DeterminePieceFromBitmapCoordinate(this.masterPuzzle, imageCoordinates.X, imageCoordinates.Y);
-            txtBoxLog.AppendText("Piece #" + clickedPiece + Environment.NewLine);
-
-            // right-click remove piece
-            if ((clickedPiece != null) && (mouseEventArgs.Button == MouseButtons.Right)) {
-                RemovePieceFromPuzzle(clickedPiece, this.masterPuzzle, this.piecesUsedInMaster);
-                pictureBox.Image = GenerateBitmapFromPuzzle(this.masterPuzzle);
-            }
-        }
-
-        private static Point GetImageCoordinatesFromPictureBoxClick(PictureBox pictureBox, int xBoxRelative, int yBoxRelative) {
-            if ((pictureBox == null) || (pictureBox.Image == null)) {
-                return Point.Empty;
-            }
-
-            int boxWidth = pictureBox.Width;
-            int boxHeight = pictureBox.Height;
-            int imgWidth = pictureBox.Image.Width;
-            int imgHeight = pictureBox.Image.Height;
-
-            Point possibleImageLocation;
-
-            switch (pictureBox.SizeMode) {
-                // image is centered and either padded or cropped equally
-                case PictureBoxSizeMode.CenterImage:
-                    possibleImageLocation = new Point(xBoxRelative - (boxWidth - imgWidth) / 2, yBoxRelative - (boxHeight - imgHeight) / 2);
-                    break;
-                // both axis are stretched to fit the picture box independently
-                case PictureBoxSizeMode.StretchImage:
-                    possibleImageLocation = new Point((int)((double)xBoxRelative * imgWidth / boxWidth), (int)((double)yBoxRelative * imgHeight / boxHeight));
-                    break;
-                // both axis are strechted by the same factor, depending on which one is the limiting dimension
-                case PictureBoxSizeMode.Zoom:
-                    // compare aspect ratios
-                    if ((double)imgWidth / imgHeight > (double)boxWidth / boxHeight) {
-                        // limited by width; so width is easy, height is NOT
-                        double scale = (double)boxWidth / imgWidth;
-                        possibleImageLocation = new Point((int)((double)xBoxRelative * imgWidth / boxWidth), (int)((yBoxRelative - (boxHeight - scale * imgHeight) / 2) / scale));
-                    }
-                    else {
-                        // limited by height; so height is easy, while width is NOT
-                        double scale = (double)boxHeight / imgHeight;
-                        possibleImageLocation = new Point((int)((xBoxRelative - (boxWidth - scale * imgWidth) / 2) / scale), (int)((double)yBoxRelative * imgHeight / boxHeight));
-                    }
-                    break;
-                // image is displayed in the upper left corner and not streched (in auto the control will try to adapt)
-                case PictureBoxSizeMode.Normal:
-                case PictureBoxSizeMode.AutoSize:
-                    possibleImageLocation = new Point(xBoxRelative, yBoxRelative);
-                    break;
-                default:
-                    possibleImageLocation = Point.Empty;
-                    break;
-            }
-
-            if ((possibleImageLocation.X >= 0) && (possibleImageLocation.X < imgWidth) && (possibleImageLocation.Y >= 0) && (possibleImageLocation.Y < imgHeight)) {
-                return possibleImageLocation;
-            }
-            else {
-                return Point.Empty;
-            }
         }
 
     }

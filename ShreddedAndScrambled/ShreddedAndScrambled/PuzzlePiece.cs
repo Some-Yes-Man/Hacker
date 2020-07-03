@@ -351,5 +351,15 @@ namespace ShreddedAndScrambled {
             }
         }
 
+        public static int GetPieceMultiEdgeDistance(PuzzlePiece piece, Dictionary<Direction, PuzzlePiece> neighboringPieces) {
+            int distanceSum = 0;
+
+            foreach (KeyValuePair<Direction, PuzzlePiece> neighbor in neighboringPieces) {
+                distanceSum += PuzzlePiece.GetPieceEdgeDistance(piece, neighbor.Value, neighbor.Key);
+            }
+
+            return distanceSum;
+        }
+
     }
 }
