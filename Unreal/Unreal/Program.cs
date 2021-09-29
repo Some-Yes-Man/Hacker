@@ -106,16 +106,41 @@ namespace Unreal {
                 //Console.ReadKey(true);
             }
 
-            String anotherCastle = Encoding.ASCII.GetString(byteStream);
+            string anotherCastle = Encoding.ASCII.GetString(byteStream);
             foreach (byte b in byteStream) {
                 Console.Write("#" + b);
             }
             Console.WriteLine();
             Console.WriteLine(anotherCastle);
-            String again = anotherCastle.Substring(anotherCastle.IndexOf("`") + 1, anotherCastle.LastIndexOf("'") - anotherCastle.IndexOf("`") - 1);
-            Console.WriteLine(anotherCastle.IndexOf("`"));
-            Console.WriteLine(anotherCastle.LastIndexOf("'") - anotherCastle.IndexOf("`") - 1);
-            Console.WriteLine(again);
+            string again = anotherCastle.Substring(anotherCastle.IndexOf("`") + 1, anotherCastle.LastIndexOf("'") - anotherCastle.IndexOf("`") - 1);
+
+            int byteArrayStart = anotherCastle.IndexOf("`") + 1;
+            int byteArrayLength = anotherCastle.LastIndexOf("'") - anotherCastle.IndexOf("`") - 1;
+
+            BigInteger powerOfTwo = 1;
+            BigInteger hugeSum = 0;
+            for (int byteIndex = byteArrayStart + byteArrayLength - 1; byteIndex >= byteArrayStart; byteIndex--) {
+                byte currentByte = byteStream[byteIndex];
+                for (int bitIndex = 0; bitIndex <= 7; bitIndex++) {
+                    byte bitMask = (byte)Math.Pow(2, bitIndex);
+                    if ((currentByte & bitMask) > 0) {
+                        hugeSum += powerOfTwo;
+                    }
+                    powerOfTwo *= 2;
+                }
+            }
+
+            Console.WriteLine("HugeSum: " + hugeSum);
+
+            BigInteger cubeRoot = BigInteger.Parse("6692121816537943568026260434533");
+            Console.WriteLine("Wolfram Alpha says this is the real cube root of HugeSum: " + cubeRoot);
+
+            byte[] cubeArray = cubeRoot.ToByteArray();
+            for (int i = cubeArray.Length - 1; i >= 0; i--) {
+                Console.Write(Encoding.ASCII.GetString(cubeArray, i, 1));
+            }
+            Console.WriteLine();
+
             Console.ReadKey(true);
         }
     }
