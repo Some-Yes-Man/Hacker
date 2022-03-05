@@ -6,13 +6,18 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="NAudio" Version="1.9.0" />
-    <PackageReference Include="NLog" Version="4.6.8" />
+    <PackageReference Include="NAudio" Version="2.0.1" />
+    <PackageReference Include="NLog" Version="4.7.14" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="2.0.0" />
+    <PackageReference Include="Spectrogram" Version="1.4.3" />
   </ItemGroup>
 
   <ItemGroup>
     <None Update="NLOG.config">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="sayIt.mp3">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
 
