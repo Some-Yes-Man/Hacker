@@ -2,7 +2,6 @@
 using NLog;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -21,8 +20,9 @@ namespace SayIt {
         private const int FFT_MAX_FREQUENCY = 2000;
         private const int FFT_EXPORT_MULTIPLIER = 65536;
         private const int SPLIT_SILENCE_DISTANCE = 1500;
-
         private const string SPECTRUM_FILE_PREFIX = "spectrum";
+        private const int CUT_THRESHOULD_WIDTH = 10;
+        private const int CUT_THRESHOLD = 5000;
 
         // straight from libs homepage
         private static Image<Rgb24> ExtractImageSubRegion(Image<Rgb24> sourceImage, Rectangle sourceArea) {
@@ -58,7 +58,7 @@ namespace SayIt {
                         int percentage = (int)(audioFile.Position * 100 / audioFile.Length);
                         if (percentage != percentageDone) {
                             percentageDone = percentage;
-                            LOGGER.Info("Completed {per,3}% ... Saving image ...", percentageDone);
+                            LOGGER.Info("Creating spectrograms .. completed {per,3}% .. saving image.", percentageDone);
 
                             // make sure the spectrogram ends during a pause (except at 100%)
                             int splitIndex = (percentageDone == 100) ? audioData.Count : DetermineSplitIndex(audioData);
@@ -68,7 +68,7 @@ namespace SayIt {
                             // save post-split data and make it the start of the new block
                             audioData = audioData.TakeLast(audioData.Count - splitIndex).ToList();
                         }
-                    } while ((samplesRead > 0) && (percentageDone < 1));
+                    } while ((samplesRead > 0) && (percentageDone < 5));
                 }
                 return result;
             }
@@ -96,24 +96,51 @@ namespace SayIt {
 
             public void ExtractSignaturesFromSpectograms(List<string> spectogramFileList) {
                 foreach (string filename in spectogramFileList) {
+                    LOGGER.Info("Cutting spectograms into words .. {per,3}% completed", spectogramFileList.IndexOf(filename) + 1);
                     using (Image<Rgb24> spectrogramCollection = Image.Load<Rgb24>(filename)) {
-                        CutIntoSingleSpectograms(spectrogramCollection);
+                        List<Image<Rgb24>> spectrogramList = CutIntoSingleSpectograms(spectrogramCollection);
+                        // FIXME: TMP
+                        foreach (Image<Rgb24> spectrogram in spectrogramList) {
+                            string path = string.Format("{0}_{1:D3}.png", filename[0..^4], spectrogramList.IndexOf(spectrogram) + 1);
+                            spectrogram.SaveAsPng(path);
+                        }
                     }
                 }
             }
 
-            private static List<Image<Rgb24>> CutIntoSingleSpectograms(Image<Rgb24> spectogramCollection) {
+            private static List<Image<Rgb24>> CutIntoSingleSpectograms(Image<Rgb24> spectogramCollectionImage) {
                 List<Image<Rgb24>> spectogramList = new List<Image<Rgb24>>();
 
-                for (int x = 0; x < 250; x++) {
+                int startIndex = -1;
+                int endIndex = -1;
+                int[] colSums = new int[CUT_THRESHOULD_WIDTH];
+                for (int x = 0; x < spectogramCollectionImage.Width; x++) {
+                    // current column sum
                     int colSum = 0;
-                    for (int y = 0; y < spectogramCollection.Height; y++) {
-                        colSum += spectogramCollection[x, y].R + spectogramCollection[x, y].G + spectogramCollection[x, y].B;
+                    for (int y = 0; y < spectogramCollectionImage.Height; y++) {
+                        colSum += spectogramCollectionImage[x, y].R + spectogramCollectionImage[x, y].G + spectogramCollectionImage[x, y].B;
                     }
-                    // FIXME: cutoff probably 1_000
-                    // locate left and right borders
-                    // cut sub-image from collection
-                    // add to list
+                    // determine start and end index for cut
+                    if ((startIndex == -1) && (colSums.Max() < CUT_THRESHOLD) && (colSum > CUT_THRESHOLD)) {
+                        startIndex = x;
+                    }
+                    if ((startIndex > -1) && (colSums.Max() < CUT_THRESHOLD) && (colSum < CUT_THRESHOLD)) {
+                        endIndex = x - CUT_THRESHOULD_WIDTH;
+                    }
+                    if (x == spectogramCollectionImage.Width - 1) {
+                        endIndex = x;
+                    }
+                    // shift column sums and add new one
+                    for (int i = colSums.Length - 2; i >= 0; i--) {
+                        colSums[i + 1] = colSums[i];
+                    }
+                    colSums[0] = colSum;
+                    // cut if found
+                    if ((startIndex > -1) && (endIndex > -1)) {
+                        spectogramList.Add(ExtractImageSubRegion(spectogramCollectionImage, new Rectangle(startIndex, 0, endIndex - startIndex + 1, spectogramCollectionImage.Height)));
+                        startIndex = -1;
+                        endIndex = -1;
+                    }
                 }
                 return spectogramList;
             }
