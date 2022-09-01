@@ -24,8 +24,8 @@ namespace Captcha {
             private static readonly float MAX_MONTE_CARLO_BOUNDING_ANGLE = 16;
             private static readonly float MAX_MONTE_CARLO_CORE_ANGLE = 2;
             private static readonly float MIN_MONTE_CARLO_ANGLE = 1;
-            private static readonly string PATH_TO_ORIGINAL_CAPTCHAS = Path.Combine("..", "..", "..", "test1");
-            private static readonly string PATH_TO_PREPROCESSED_CAPTCHAS = Path.Combine("..", "..", "..", "test1_stage1");
+            private static readonly string PATH_TO_ORIGINAL_CAPTCHAS = Path.Combine("..", "..", "..", "cap1");
+            private static readonly string PATH_TO_PREPROCESSED_CAPTCHAS = Path.Combine("..", "..", "..", "cap1_stage1");
             private static readonly string PATH_TO_CLOSE_MATCHES = Path.Combine("..", "..", "..", "matches");
             private static readonly string MATCH_RECORD_FILE = Path.Combine("..", "..", "..", "matches.xml");
             private static readonly XmlSerializer xmlSerializer = new XmlSerializer(typeof(List<CaptchaMatch>));

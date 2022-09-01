@@ -1,303 +1,31 @@
 <?xml version="1.0"?>
 <ArrayOfCaptchaMatch xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <CaptchaMatch>
-    <major>502</major>
-    <minor>4377</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>574</major>
-    <minor>5729</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>580</major>
-    <minor>7195</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>595</major>
-    <minor>4634</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>767</major>
-    <minor>4660</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>926</major>
-    <minor>7213</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
     <major>933</major>
     <minor>1361</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>943</major>
-    <minor>6731</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>1029</major>
-    <minor>8070</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>1078</major>
-    <minor>1500</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>1345</major>
-    <minor>5320</minor>
   </CaptchaMatch>
   <CaptchaMatch>
     <major>1388</major>
     <minor>8326</minor>
   </CaptchaMatch>
   <CaptchaMatch>
-    <major>1419</major>
-    <minor>8779</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>1467</major>
-    <minor>6393</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>1530</major>
-    <minor>8441</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>1557</major>
-    <minor>8219</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>1575</major>
-    <minor>6547</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>1661</major>
-    <minor>5350</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>1681</major>
-    <minor>5041</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>1712</major>
-    <minor>5907</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>1873</major>
-    <minor>4052</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>1899</major>
-    <minor>4885</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>2042</major>
-    <minor>4510</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>2052</major>
-    <minor>6676</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>2075</major>
-    <minor>8019</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>2360</major>
-    <minor>3065</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>2406</major>
-    <minor>8298</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>2431</major>
-    <minor>2627</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>2448</major>
-    <minor>7252</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>2708</major>
-    <minor>7488</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>2961</major>
-    <minor>3764</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>2975</major>
-    <minor>6337</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>2984</major>
-    <minor>6696</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>3037</major>
-    <minor>9304</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>3064</major>
-    <minor>9723</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
     <major>3119</major>
     <minor>9197</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>3144</major>
-    <minor>4100</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>3253</major>
-    <minor>5624</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>3343</major>
-    <minor>4087</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>3573</major>
-    <minor>8942</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>3668</major>
-    <minor>7212</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>3909</major>
-    <minor>8881</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>3916</major>
-    <minor>8418</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>3991</major>
-    <minor>6285</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>4023</major>
-    <minor>9867</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>4051</major>
-    <minor>7696</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>4220</major>
-    <minor>9505</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>4315</major>
-    <minor>9349</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>4369</major>
-    <minor>6661</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>4424</major>
-    <minor>6676</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>4457</major>
-    <minor>4955</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>4477</major>
-    <minor>6059</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>4643</major>
-    <minor>8196</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>4736</major>
-    <minor>6759</minor>
   </CaptchaMatch>
   <CaptchaMatch>
     <major>4951</major>
     <minor>5332</minor>
   </CaptchaMatch>
   <CaptchaMatch>
-    <major>5003</major>
-    <minor>6644</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
     <major>5436</major>
     <minor>8235</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>5708</major>
-    <minor>8955</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>5746</major>
-    <minor>6384</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>5930</major>
-    <minor>6283</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>6296</major>
-    <minor>7701</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>6324</major>
-    <minor>8942</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>6368</major>
-    <minor>8135</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>6540</major>
-    <minor>6873</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>6794</major>
-    <minor>7548</minor>
   </CaptchaMatch>
   <CaptchaMatch>
     <major>7035</major>
     <minor>8942</minor>
   </CaptchaMatch>
   <CaptchaMatch>
-    <major>7063</major>
-    <minor>9855</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>7113</major>
-    <minor>9285</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>7266</major>
-    <minor>9624</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
     <major>7294</major>
     <minor>9923</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>7390</major>
-    <minor>9746</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>7655</major>
-    <minor>7685</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>7859</major>
-    <minor>9541</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>8374</major>
-    <minor>9391</minor>
-  </CaptchaMatch>
-  <CaptchaMatch>
-    <major>8641</major>
-    <minor>9889</minor>
   </CaptchaMatch>
 </ArrayOfCaptchaMatch>
