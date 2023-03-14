@@ -1,5 +1,5 @@
-﻿using NLog;
-using System.Text.Json;
+﻿using Newtonsoft.Json;
+using NLog;
 using System.Text.RegularExpressions;
 
 namespace AnybodyOutThere {
@@ -13,6 +13,7 @@ namespace AnybodyOutThere {
         const int REQ_X_COUNT = COUNT_X;
         const int REQ_Y_COUNT = COUNT_Y;
         const int TASK_COUNT = 10;
+        const bool REQ_ENABLED = false;
 
         private static readonly UriBuilder requestBuilder = new UriBuilder("https://www.hacker.org/challenge/misc/twonumbers.php");
         private static readonly Regex numberParser = new(".*?form>\\s*?(\\d+)<br>(\\d+)<br>(\\d+)<br>(\\d+)<br>(\\d+)<br>(\\d+)<br>(\\d+)<br>(\\d+)<br>(\\d+)<br>(\\d+)<br>(\\d+)<br>(\\d+)<br>.*");
@@ -39,7 +40,10 @@ namespace AnybodyOutThere {
                 Match match = numberParser.Match(await msg.Content.ReadAsStringAsync());
                 if (match.Success) {
                     for (int i = 0; i < OutThereData.COUNT_RESULT; i++) {
-                        results[tasks[modIndex].Item2 * COUNT_X + tasks[modIndex].Item1].Data[i] = int.Parse(match.Groups[i + 1].Value);
+                        int currentIndex = tasks[modIndex].Item2 * COUNT_X + tasks[modIndex].Item1;
+                        results[currentIndex].X = tasks[modIndex].Item1;
+                        results[currentIndex].Y = tasks[modIndex].Item2;
+                        results[currentIndex].Data[i] = int.Parse(match.Groups[i + 1].Value);
                     }
                 }
                 else {
@@ -53,29 +57,60 @@ namespace AnybodyOutThere {
                 results[i] = new OutThereData();
             }
 
-            using (HttpClient client = new HttpClient()) {
-                int currentIndex = 0;
+            if (REQ_ENABLED) {
+                using (HttpClient client = new HttpClient()) {
+                    int currentIndex = 0;
 
-                for (int x = REQ_X_START; x < REQ_X_START + REQ_X_COUNT; x++) {
-                    for (int y = REQ_Y_START; y < REQ_Y_START + REQ_Y_COUNT; y++) {
-                        currentIndex++;
-                        getPreviousTaskResult(currentIndex);
+                    for (int x = REQ_X_START; x < REQ_X_START + REQ_X_COUNT; x++) {
+                        for (int y = REQ_Y_START; y < REQ_Y_START + REQ_Y_COUNT; y++) {
+                            currentIndex++;
+                            getPreviousTaskResult(currentIndex);
 
-                        LOGGER.Info("Requesting x:" + x + " y:" + y);
-                        requestBuilder.Query = "go=Try&one=" + x + "&two=" + y;
-                        tasks[currentIndex % 10] = new Tuple<int, int, Task<HttpResponseMessage>>(x, y, client.GetAsync(requestBuilder.Uri));
+                            LOGGER.Info("Requesting x:" + x + " y:" + y);
+                            requestBuilder.Query = "go=Try&one=" + x + "&two=" + y;
+                            tasks[currentIndex % 10] = new Tuple<int, int, Task<HttpResponseMessage>>(x, y, client.GetAsync(requestBuilder.Uri));
+                        }
+                    }
+
+                    for (int i = 0; i < TASK_COUNT; i++) {
+                        getPreviousTaskResult(i);
+                    }
+                    LOGGER.Info("Done.");
+                }
+
+                using (StreamWriter streamWriter = new StreamWriter("E:\\Yes-Man\\Dropbox\\anybody.json", new FileStreamOptions { Mode = FileMode.Create })) {
+                    using (JsonWriter jsonWriter = new JsonTextWriter(streamWriter)) {
+                        JsonSerializer jsonSerializer = JsonSerializer.Create(new JsonSerializerSettings { Formatting = Formatting.None });
+                        jsonSerializer.Serialize(jsonWriter, results);
                     }
                 }
-
-                for (int i = 0; i < TASK_COUNT; i++) {
-                    getPreviousTaskResult(i);
-                }
-                LOGGER.Info("Done.");
             }
-
-            using FileStream fileStream = File.Create("E:\\Yes-Man\\Dropbox\\anybody.json");
-            await JsonSerializer.SerializeAsync(fileStream, results, new JsonSerializerOptions { WriteIndented = false });
-            await fileStream.DisposeAsync();
+            else {
+                List<OutThereData>? outThereData;
+                using (StreamReader reader = new StreamReader("C:\\Users\\robert.krausse\\Dropbox\\anybody.json")) {
+                    string jsonString = reader.ReadToEnd();
+                    outThereData = JsonConvert.DeserializeObject<List<OutThereData>>(jsonString);
+                    if (outThereData != null) {
+                        for (int d = 0; d < OutThereData.COUNT_RESULT; d++) {
+                            Image<Rgb24> image = new Image<Rgb24>(COUNT_X, COUNT_Y);
+                            for (int y = 0; y < COUNT_Y; y++) {
+                                image.ProcessPixelRows(source => {
+                                    Span<Rgb24> row = source.GetRowSpan(y);
+                                    for (int x = 0; x < COUNT_X; x++) {
+                                        byte grayValue = (byte)((1000.0 / outThereData[y * COUNT_X + x].Data[d]) * 255);
+                                        ref Rgb24 pixel = ref row[x];
+                                        pixel.R = grayValue;
+                                        pixel.G = grayValue;
+                                        pixel.B = grayValue;
+                                    }
+                                });
+                            }
+                            LOGGER.Info("Saving data image #" + d + ".");
+                            image.SaveAsBmp("data" + d + ".bmp");
+                        }
+                    }
+                }
+            }
         }
     }
 }
