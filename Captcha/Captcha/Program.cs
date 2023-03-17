@@ -16,16 +16,16 @@ namespace Captcha {
         public class CaptchaSolver {
 
             public class CaptchaMatch {
-                public int major { get; set; }
-                public int minor { get; set; }
+                public int Major { get; set; }
+                public int Minor { get; set; }
             }
 
             private static readonly int MAXIMUM_DEVIATION_FROM_BLACK = 50;
-            private static readonly float MAX_MONTE_CARLO_BOUNDING_ANGLE = 16;
-            private static readonly float MAX_MONTE_CARLO_CORE_ANGLE = 2;
-            private static readonly float MIN_MONTE_CARLO_ANGLE = 1;
-            private static readonly string PATH_TO_ORIGINAL_CAPTCHAS = Path.Combine("..", "..", "..", "test1");
-            private static readonly string PATH_TO_PREPROCESSED_CAPTCHAS = Path.Combine("..", "..", "..", "test1_stage1");
+            private static readonly float MAX_NEWTON_BOUNDING_ANGLE = 16;
+            private static readonly float MAX_NEWTON_CORE_ANGLE = 2;
+            private static readonly float MIN_NEWTON_ANGLE = 1;
+            private static readonly string PATH_TO_ORIGINAL_CAPTCHAS = Path.Combine("..", "..", "..", "captcha");
+            private static readonly string PATH_TO_PREPROCESSED_CAPTCHAS = Path.Combine("..", "..", "..", "captcha_stage1");
             private static readonly string PATH_TO_CLOSE_MATCHES = Path.Combine("..", "..", "..", "matches");
             private static readonly string MATCH_RECORD_FILE = Path.Combine("..", "..", "..", "matches.xml");
             private static readonly XmlSerializer xmlSerializer = new XmlSerializer(typeof(List<CaptchaMatch>));
@@ -121,7 +121,7 @@ namespace Captcha {
                 image.Mutate(x => x.Crop(Rectangle.FromLTRB(left, top, right, bottom)));
             }
 
-            // use this to monte-carlo the shit out of the pictures
+            // use this to newton the shit out of the pictures
             private static int VirtuallyRotateAndDetermineHeight(Image<Rgb24> image, float degrees, bool limitToCoreBox) {
                 Image<Rgb24> clonedImage = image.Clone();
                 clonedImage.Mutate(x => x.Rotate(degrees));
@@ -129,13 +129,13 @@ namespace Captcha {
                 return cloneDimensions.Item3 - cloneDimensions.Item1 + 1;
             }
 
-            private static float MonteCarloRotationAngle(Image<Rgb24> image) {
+            private static float NewtonRotationAngle(Image<Rgb24> image) {
                 int currentHeight = image.Height;
                 float resultingAngle = 0;
-                float currentAngleChange = MAX_MONTE_CARLO_BOUNDING_ANGLE;
+                float currentAngleChange = MAX_NEWTON_BOUNDING_ANGLE;
                 bool limitToCoreBox = false;
 
-                while (currentAngleChange >= MIN_MONTE_CARLO_ANGLE) {
+                while (currentAngleChange >= MIN_NEWTON_ANGLE) {
                     // calculate diff in both directions
                     int trialHeight1 = VirtuallyRotateAndDetermineHeight(image, resultingAngle + currentAngleChange, limitToCoreBox);
                     int trialHeight2 = VirtuallyRotateAndDetermineHeight(image, resultingAngle - currentAngleChange, limitToCoreBox);
@@ -157,11 +157,60 @@ namespace Captcha {
                         }
                     }
 
-                    // first round done .. now switch to core mode
-                    if (!limitToCoreBox && (currentAngleChange < MIN_MONTE_CARLO_ANGLE)) {
-                        limitToCoreBox = true;
-                        currentAngleChange = MAX_MONTE_CARLO_CORE_ANGLE;
+                    //// first round done .. now switch to core mode
+                    //if (!limitToCoreBox && (currentAngleChange < MIN_NEWTON_ANGLE)) {
+                    //    limitToCoreBox = true;
+                    //    currentAngleChange = MAX_NEWTON_CORE_ANGLE;
+                    //}
+                }
+                return resultingAngle;
+            }
+
+            private static float NewtonRotationAngle_2(Image<Rgb24> image) {
+                int currentHeight = image.Height;
+                float resultingAngle = 0;
+                float currentAngleChange = MAX_NEWTON_BOUNDING_ANGLE;
+                bool limitToCoreBox = false;
+
+                while (currentAngleChange >= MIN_NEWTON_ANGLE) {
+                    LOGGER.Trace("Rotating image of height {height}.", image.Height);
+                    // calculate diff in both directions
+                    int trialHeight1 = VirtuallyRotateAndDetermineHeight(image, resultingAngle + currentAngleChange, limitToCoreBox);
+                    LOGGER.Trace("Rotated {angle} and got a height of {height}.", resultingAngle + currentAngleChange, trialHeight1);
+                    int trialHeight2 = VirtuallyRotateAndDetermineHeight(image, resultingAngle - currentAngleChange, limitToCoreBox);
+                    LOGGER.Trace("Rotated {angle} and got a height of {height}.", resultingAngle - currentAngleChange, trialHeight2);
+
+                    // both suck
+                    if ((trialHeight1 >= currentHeight) && (trialHeight2 >= currentHeight)) {
+                        currentAngleChange /= 2;
+                        LOGGER.Trace("Rotation made it worse. Changing rotation angle to: {}", currentAngleChange);
                     }
+                    else {
+                        // at least one is better
+                        if (trialHeight1 - trialHeight2 <= 0) {
+                            LOGGER.Trace("Rotation change: {}", currentAngleChange);
+                            resultingAngle += currentAngleChange;
+                            currentHeight = trialHeight1;
+                        }
+                        else {
+                            LOGGER.Trace("Rotation change: -{}", currentAngleChange);
+                            resultingAngle -= currentAngleChange;
+                            currentHeight = trialHeight2;
+                        }
+                    }
+
+                    //// first round done .. now switch to core mode
+                    //if (!limitToCoreBox && (currentAngleChange < MIN_NEWTON_ANGLE)) {
+                    //    LOGGER.Trace("Switching to core box rotation.");
+
+                    //    using FileStream fileStream = new FileStream("test_3_Original.png", FileMode.Create, FileAccess.Write);
+                    //    Image<Rgb24> clonedImage = image.Clone();
+                    //    clonedImage.Mutate(x => x.Rotate(resultingAngle));
+                    //    clonedImage.SaveAsPng(fileStream);
+
+                    //    limitToCoreBox = true;
+                    //    currentAngleChange = MAX_NEWTON_CORE_ANGLE;
+                    //}
                 }
                 return resultingAngle;
             }
@@ -170,25 +219,24 @@ namespace Captcha {
                 // preprocess all images
                 foreach (string captchaFile in Directory.GetFiles(PATH_TO_ORIGINAL_CAPTCHAS)) {
                     LOGGER.Debug("Reading file: " + captchaFile);
-                    using (Image<Rgb24> originalImage = Image.Load<Rgb24>(captchaFile)) {
-                        // initial crop
-                        CropImageToBoundingBox(originalImage);
 
-                        // monte carlo for a rotation angle
-                        string filenameOnly = Path.GetFileName(captchaFile);
-                        float rotationAngle = MonteCarloRotationAngle(originalImage);
-                        LOGGER.Warn("Angle should be: " + rotationAngle);
-                        // rotate
-                        originalImage.Mutate(x => x.Rotate(rotationAngle));
-                        originalImage.Mutate(x => x.BinaryThreshold(0.7f, Color.White, Color.Black));
+                    using Image<Rgb24> originalImage = Image.Load<Rgb24>(captchaFile);
+                    // initial crop
+                    CropImageToBoundingBox(originalImage);
 
-                        // crop again
-                        CropImageToBoundingBox(originalImage);
+                    // newton for a rotation angle
+                    string filenameOnly = Path.GetFileName(captchaFile);
+                    float rotationAngle = NewtonRotationAngle(originalImage);
+                    LOGGER.Warn("Angle should be: " + rotationAngle);
+                    // rotate
+                    originalImage.Mutate(x => x.Rotate(rotationAngle));
+                    originalImage.Mutate(x => x.BinaryThreshold(0.7f, Color.White, Color.Black));
 
-                        using (FileStream fileStream = new FileStream(Path.Combine(PATH_TO_PREPROCESSED_CAPTCHAS, Path.GetFileName(captchaFile)), FileMode.Create, FileAccess.Write)) {
-                            originalImage.SaveAsPng(fileStream);
-                        }
-                    }
+                    // crop again
+                    CropImageToBoundingBox(originalImage);
+
+                    using FileStream fileStream = new FileStream(Path.Combine(PATH_TO_PREPROCESSED_CAPTCHAS, Path.GetFileName(captchaFile)), FileMode.Create, FileAccess.Write);
+                    originalImage.SaveAsPng(fileStream);
                 }
             }
 
@@ -217,6 +265,37 @@ namespace Captcha {
             }
 
             public void Run() {
+                //LOGGER.Info("Testing rotation.");
+                //// im3110.png (pseudonyms)
+                //string testFile = Path.Combine(PATH_TO_ORIGINAL_CAPTCHAS, "im3110.png");
+                //using Image<Rgb24> originalImage = Image.Load<Rgb24>(testFile);
+
+                //using FileStream originalFileStream = new FileStream("test_1_Original.png", FileMode.Create, FileAccess.Write);
+                //originalImage.SaveAsPng(originalFileStream);
+
+                //// initial crop
+                //CropImageToBoundingBox(originalImage);
+
+                //using FileStream croppedFileStream = new FileStream("test_2_Cropped.png", FileMode.Create, FileAccess.Write);
+                //originalImage.SaveAsPng(croppedFileStream);
+
+                //// newton for a rotation angle
+                //float rotationAngle = NewtonRotationAngle_2(originalImage);
+                //// rotate
+                //originalImage.Mutate(x => x.Rotate(rotationAngle));
+                //originalImage.Mutate(x => x.BinaryThreshold(0.7f, Color.White, Color.Black));
+
+                //using FileStream rotatedFileStream = new FileStream("test_4_Rotated.png", FileMode.Create, FileAccess.Write);
+                //originalImage.SaveAsPng(rotatedFileStream);
+
+                //// crop again
+                //CropImageToBoundingBox(originalImage);
+
+                //using FileStream finishedFileStream = new FileStream("test_5_Finished.png", FileMode.Create, FileAccess.Write);
+                //originalImage.SaveAsPng(finishedFileStream);
+
+                //return;
+
                 LOGGER.Info("Captcha Solver running.");
 
                 // make sure preprocess directory exists
@@ -242,8 +321,8 @@ namespace Captcha {
                     PreProcessImages();
                 }
 
-                long maxSimilarity = 0;
                 string maxSimilarityString;
+                long maxSimilarity;
                 do {
                     LOGGER.Warn("Maximum result similarity (100k will find hits; increasing will find more):");
                     maxSimilarityString = Console.ReadLine();
@@ -279,14 +358,13 @@ namespace Captcha {
                             Guid guid = Guid.NewGuid();
                             File.Copy(completeImageData[major].Key, Path.Combine(PATH_TO_CLOSE_MATCHES, guid + "_" + Path.GetFileName(completeImageData[major].Key)));
                             File.Copy(completeImageData[minor].Key, Path.Combine(PATH_TO_CLOSE_MATCHES, guid + "_" + Path.GetFileName(completeImageData[minor].Key)));
-                            recordedMatches.Add(new CaptchaMatch() { major = major, minor = minor });
+                            recordedMatches.Add(new CaptchaMatch() { Major = major, Minor = minor });
                         }
                     }
                 }
 
-                using (FileStream fileStream = new FileStream(MATCH_RECORD_FILE, FileMode.Create, FileAccess.Write)) {
-                    xmlSerializer.Serialize(fileStream, recordedMatches);
-                }
+                using FileStream fileStream = new FileStream(MATCH_RECORD_FILE, FileMode.Create, FileAccess.Write);
+                xmlSerializer.Serialize(fileStream, recordedMatches);
             }
 
         }

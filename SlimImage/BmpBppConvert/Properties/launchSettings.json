@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "BmpBppConvert": {
+      "commandName": "Project",
+      "commandLineArgs": "\"C:\\Users\\robert.krausse\\Downloads\\picnic.bmp\" \"C:\\Users\\robert.krausse\\Downloads\\picnic2.bmp\""
+    }
+  }
+}
