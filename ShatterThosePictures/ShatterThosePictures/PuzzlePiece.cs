@@ -1,33 +1,122 @@
 ﻿using NLog;
+using System.Collections;
 
 namespace ShatterThosePictures {
     public class PuzzlePiece {
-        private static readonly Logger LOGGER = LogManager.GetCurrentClassLogger();
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+        private enum MaskArea {
+            OUTER_EDGE,
+            INNER_EDGE,
+            CORE
+        }
+
+        // [2 * OFFSET] + [COUNT * (THICC + SPACE)] - SPACE
 
         // puzzle #2
-        //public const byte DATA_WIDTH = 18;
-        //public const byte DATA_HEIGHT = 18;
-        //public const byte BIT_COUNT = 3;
-        // puzzle #1
-        public const byte DATA_WIDTH = 24;
-        public const byte DATA_HEIGHT = 24;
+        public const byte DATA_WIDTH = 57;
+        public const byte BIT_OFFSET = 10;
         public const byte BIT_COUNT = 5;
+        public const byte BIT_THICCNESS = 5;
+        public const byte BIT_SPACING = 3;
 
-        public const byte BIT_THICCNESS = 2;
-        public const byte BIT_OFFSET = 5;
-        public const byte BIT_SPACING = 1;
-        public const byte BIT_LENGTH = 2;
+        // puzzle #1
+        //public const byte DATA_WIDTH = 24;
+        //public const byte BIT_COUNT = 5;
+        //public const byte BIT_THICCNESS = 2;
+        //public const byte BIT_OFFSET = 5;
+        //public const byte BIT_SPACING = 1;
+        public const byte DATA_HEIGHT = DATA_WIDTH;
+        public const byte BIT_LENGTH = 4;
 
         private static int ID_GENERATOR = 0;
 
         public int Id { get; private set; }
-        public byte NorthEdge { get; set; }
-        public byte SouthEdge { get; set; }
-        public byte EastEdge { get; set; }
-        public byte WestEdge { get; set; }
+
+        private BitArray north = new BitArray(1);
+        private BitArray south = new BitArray(1);
+        private BitArray east = new BitArray(1);
+        private BitArray west = new BitArray(1);
+        private byte northEdge;
+        private byte southEdge;
+        private byte eastEdge;
+        private byte westEdge;
+        public byte NorthEdge {
+            get => this.northEdge;
+            set {
+                this.north = new BitArray(new byte[] { value });
+                this.northEdge = value;
+            }
+        }
+        public byte SouthEdge {
+            get => this.southEdge;
+            set {
+                this.south = new BitArray(new byte[] { value });
+                this.southEdge = value;
+            }
+        }
+        public byte EastEdge {
+            get => this.eastEdge;
+            set {
+                this.east = new BitArray(new byte[] { value });
+                this.eastEdge = value;
+            }
+        }
+        public byte WestEdge {
+            get => this.westEdge;
+            set {
+                this.west = new BitArray(new byte[] { value });
+                this.westEdge = value;
+            }
+        }
+
         public HashSet<Direction> PuzzleEdges { get; set; }
         public Color[,] ImageData { get; set; }
         public string Filename { get; set; }
+
+        private static bool BitmapRowIsCore(Image<Rgba32> image, byte y, Rgba32 backgroundColor) {
+            byte consecutiveDataPixels = 0;
+            bool isCore = false;
+            image.ProcessPixelRows(accesssor => {
+                Span<Rgba32> row = accesssor.GetRowSpan(y);
+                for (byte x = 0; x < image.Width; x++) {
+                    ref Rgba32 pixel = ref row[x];
+                    if (!pixel.Equals(backgroundColor)) {
+                        consecutiveDataPixels++;
+                    }
+                    else {
+                        consecutiveDataPixels = 0;
+                    }
+                    if (consecutiveDataPixels == 3) {
+                        isCore = true;
+                        return;
+                    }
+                }
+            });
+            return isCore;
+        }
+
+        private static bool BitmapColIsCore(Image<Rgba32> image, byte x, Rgba32 backgroundColor) {
+            byte consecutiveDataPixels = 0;
+            bool isCore = false;
+            image.ProcessPixelRows(accessor => {
+                for (byte y = 0; y < image.Height; y++) {
+                    Span<Rgba32> row = accessor.GetRowSpan(y);
+                    ref Rgba32 pixel = ref row[x];
+                    if (!pixel.Equals(backgroundColor)) {
+                        consecutiveDataPixels++;
+                    }
+                    else {
+                        consecutiveDataPixels = 0;
+                    }
+                    if (consecutiveDataPixels == 3) {
+                        isCore = true;
+                        return;
+                    }
+                }
+            });
+            return isCore;
+        }
 
         public PuzzlePiece() {
             this.PuzzleEdges = new HashSet<Direction>() { };
@@ -42,14 +131,14 @@ namespace ShatterThosePictures {
             this.ImageData = new Color[DATA_WIDTH, DATA_HEIGHT];
 
             // get initial pixel & data area
-            LOGGER.Trace("Reading '{filename}'.", filename);
-            Image<Rgb24> image = Image.Load<Rgb24>(filename);
+            Logger.Trace("Reading '{filename}'.", filename);
+            Image<Rgba32> image = Image.Load<Rgba32>(filename);
 
-            Rgb24 backgroundColor = new();
+            Rgba32 backgroundColor = new();
             image.ProcessPixelRows(accessor => {
-                Span<Rgb24> row = accessor.GetRowSpan(0);
-                ref Rgb24 pixel = ref row[0];
-                backgroundColor.FromRgb24(pixel);
+                Span<Rgba32> row = accessor.GetRowSpan(0);
+                ref Rgba32 pixel = ref row[0];
+                backgroundColor.FromRgba32(pixel);
             });
 
             byte startX = 0;
@@ -63,14 +152,14 @@ namespace ShatterThosePictures {
             // remove bit length from starting positions to catch outer bits
             startX -= BIT_LENGTH;
             startY -= BIT_LENGTH;
-            LOGGER.Trace("Found image data at {x}:{y}.", startX, startY);
+            Logger.Trace("Found image data at {x}:{y}.", startX, startY);
 
             // get image data
             image.ProcessPixelRows(accessor => {
                 for (byte y = startY; y < (startY + DATA_HEIGHT); y++) {
-                    Span<Rgb24> row = accessor.GetRowSpan(y);
+                    Span<Rgba32> row = accessor.GetRowSpan(y);
                     for (byte x = startX; x < (startX + DATA_WIDTH); x++) {
-                        ref Rgb24 pixel = ref row[x];
+                        ref Rgba32 pixel = ref row[x];
                         this.ImageData[x - startX, y - startY] = pixel.Equals(backgroundColor) ? Color.Transparent : new Color(pixel);
                     }
                 }
@@ -138,6 +227,149 @@ namespace ShatterThosePictures {
             }
         }
 
+        public void LoadData(Image<Rgba32> image, int pieceOffsetX, int pieceOffsetY) {
+            image.ProcessPixelRows(accessor => {
+                int startY = pieceOffsetY * (DATA_HEIGHT - BIT_LENGTH);
+                int endY = pieceOffsetY * (DATA_HEIGHT - BIT_LENGTH) + DATA_HEIGHT;
+
+                for (int y = startY; y < endY; y++) {
+                    Span<Rgba32> row = accessor.GetRowSpan(y);
+                    int startX = pieceOffsetX * (DATA_WIDTH - BIT_LENGTH);
+                    int endX = pieceOffsetX * (DATA_WIDTH - BIT_LENGTH) + DATA_WIDTH;
+
+                    for (int x = startX; x < endX; x++) {
+                        ref Rgba32 pixel = ref row[x];
+                        this.ImageData[x - startX, y - startY] = new Color(pixel);
+                    }
+                }
+            });
+            MaskData();
+        }
+
+        private void MaskData() {
+            MaskArea areaX = MaskArea.OUTER_EDGE;
+            MaskArea areaY = MaskArea.OUTER_EDGE;
+
+            for (int y = 0; y < DATA_HEIGHT; y++) {
+                if (((0 <= y) && (y < BIT_LENGTH)) || ((DATA_HEIGHT - BIT_LENGTH <= y) && (y < DATA_HEIGHT))) {
+                    areaY = MaskArea.OUTER_EDGE;
+                }
+                if (((BIT_LENGTH <= y) && (y < BIT_LENGTH * 2)) || ((DATA_HEIGHT - BIT_LENGTH * 2 <= y) && (y < DATA_HEIGHT - BIT_LENGTH))) {
+                    areaY = MaskArea.INNER_EDGE;
+                }
+                if ((BIT_LENGTH * 2 <= y) && (y < DATA_HEIGHT - BIT_LENGTH * 2)) {
+                    areaY = MaskArea.CORE;
+                }
+
+                for (int x = 0; x < DATA_WIDTH; x++) {
+                    if (((0 <= x) && (x < BIT_LENGTH)) || ((DATA_HEIGHT - BIT_LENGTH <= x) && (x < DATA_HEIGHT))) {
+                        areaX = MaskArea.OUTER_EDGE;
+                    }
+                    if (((BIT_LENGTH <= x) && (x < BIT_LENGTH * 2)) || ((DATA_HEIGHT - BIT_LENGTH * 2 <= x) && (x < DATA_HEIGHT - BIT_LENGTH))) {
+                        areaX = MaskArea.INNER_EDGE;
+                    }
+                    if ((BIT_LENGTH * 2 <= x) && (x < DATA_HEIGHT - BIT_LENGTH * 2)) {
+                        areaX = MaskArea.CORE;
+                    }
+
+                    switch (areaY) {
+                        case MaskArea.OUTER_EDGE:
+                            if ((areaX == MaskArea.OUTER_EDGE) || (areaX == MaskArea.INNER_EDGE)) {
+                                this.ImageData[x, y] = Color.Transparent;
+                            }
+                            if (areaX == MaskArea.CORE) {
+                                // start + end offset
+                                if ((x < BIT_OFFSET) || (x >= DATA_WIDTH - BIT_OFFSET)) {
+                                    this.ImageData[x, y] = Color.Transparent;
+                                }
+                                else {
+                                    int relX = x - BIT_OFFSET;
+                                    // spaces
+                                    if (relX % (BIT_THICCNESS + BIT_SPACING) >= BIT_THICCNESS) {
+                                        this.ImageData[x, y] = Color.Transparent;
+                                    }
+                                    // bits
+                                    else {
+                                        BitArray northSouthEdge = (y < BIT_LENGTH) ? north : south;
+                                        if (!northSouthEdge[relX / (BIT_THICCNESS + BIT_SPACING)]) {
+                                            this.ImageData[x, y] = Color.Transparent;
+                                        }
+                                    }
+                                }
+                            }
+                            break;
+                        case MaskArea.INNER_EDGE:
+                            if (areaX == MaskArea.OUTER_EDGE) {
+                                this.ImageData[x, y] = Color.Transparent;
+                            }
+                            if (areaX == MaskArea.INNER_EDGE) {
+                                // no masking needed
+                            }
+                            if (areaX == MaskArea.CORE) {
+                                int relX = x - BIT_OFFSET;
+                                // bits
+                                if ((x >= BIT_OFFSET) && (x < DATA_WIDTH - BIT_OFFSET) && (relX % (BIT_THICCNESS + BIT_SPACING) < BIT_THICCNESS)) {
+                                    BitArray northSouthEdge = (y < BIT_LENGTH * 2) ? north : south;
+                                    if (!northSouthEdge[relX / (BIT_THICCNESS + BIT_SPACING)]) {
+                                        this.ImageData[x, y] = Color.Transparent;
+                                    }
+                                }
+                            }
+                            break;
+                        case MaskArea.CORE:
+                            if (areaX == MaskArea.OUTER_EDGE) {
+                                // start + end offset
+                                if ((y < BIT_OFFSET) || (y >= DATA_WIDTH - BIT_OFFSET)) {
+                                    this.ImageData[x, y] = Color.Transparent;
+                                }
+                                else {
+                                    int relY = y - BIT_OFFSET;
+                                    // spaces
+                                    if (relY % (BIT_THICCNESS + BIT_SPACING) >= BIT_THICCNESS) {
+                                        this.ImageData[x, y] = Color.Transparent;
+                                    }
+                                    // bits
+                                    else {
+                                        BitArray westEastEdge = (x < BIT_LENGTH) ? west : east;
+                                        if (!westEastEdge[relY / (BIT_THICCNESS + BIT_SPACING)]) {
+                                            this.ImageData[x, y] = Color.Transparent;
+                                        }
+                                    }
+                                }
+                            }
+                            if (areaX == MaskArea.INNER_EDGE) {
+                                int relY = y - BIT_OFFSET;
+                                // bits
+                                if ((y >= BIT_OFFSET) && (y < DATA_HEIGHT - BIT_OFFSET) && (relY % (BIT_THICCNESS + BIT_SPACING) < BIT_THICCNESS)) {
+                                    BitArray westEastEdge = (x < BIT_LENGTH * 2) ? west : east;
+                                    if (!westEastEdge[relY / (BIT_THICCNESS + BIT_SPACING)]) {
+                                        this.ImageData[x, y] = Color.Transparent;
+                                    }
+                                }
+                            }
+                            if (areaX == MaskArea.CORE) {
+                                // no masking needed
+                            }
+                            break;
+                    }
+                }
+            }
+        }
+
+        public void SaveToFile(string filename) {
+            using Image<Rgba32> image = new(DATA_WIDTH, DATA_HEIGHT, Color.Transparent);
+            image.ProcessPixelRows(accessor => {
+                for (int y = 0; y < DATA_HEIGHT; y++) {
+                    Span<Rgba32> row = accessor.GetRowSpan(y);
+                    for (int x = 0; x < DATA_WIDTH; x++) {
+                        ref Rgba32 pixel = ref row[x];
+                        pixel = this.ImageData[x, y];
+                    }
+                }
+            });
+            image.Save(filename);
+        }
+
         public override int GetHashCode() {
             return this.Id;
         }
@@ -151,50 +383,6 @@ namespace ShatterThosePictures {
 
         public override string ToString() {
             return this.Id.ToString();
-        }
-
-        private static bool BitmapRowIsCore(Image<Rgb24> image, byte y, Rgb24 backgroundColor) {
-            byte consecutiveDataPixels = 0;
-            bool isCore = false;
-            image.ProcessPixelRows(accesssor => {
-                Span<Rgb24> row = accesssor.GetRowSpan(y);
-                for (byte x = 0; x < image.Width; x++) {
-                    ref Rgb24 pixel = ref row[x];
-                    if (!pixel.Equals(backgroundColor)) {
-                        consecutiveDataPixels++;
-                    }
-                    else {
-                        consecutiveDataPixels = 0;
-                    }
-                    if (consecutiveDataPixels == 3) {
-                        isCore = true;
-                        return;
-                    }
-                }
-            });
-            return isCore;
-        }
-
-        private static bool BitmapColIsCore(Image<Rgb24> image, byte x, Rgb24 backgroundColor) {
-            byte consecutiveDataPixels = 0;
-            bool isCore = false;
-            image.ProcessPixelRows(accessor => {
-                for (byte y = 0; y < image.Height; y++) {
-                    Span<Rgb24> row = accessor.GetRowSpan(y);
-                    ref Rgb24 pixel = ref row[x];
-                    if (!pixel.Equals(backgroundColor)) {
-                        consecutiveDataPixels++;
-                    }
-                    else {
-                        consecutiveDataPixels = 0;
-                    }
-                    if (consecutiveDataPixels == 3) {
-                        isCore = true;
-                        return;
-                    }
-                }
-            });
-            return isCore;
         }
 
     }

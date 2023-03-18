@@ -2,7 +2,7 @@
   "profiles": {
     "ShatterThosePictures": {
       "commandName": "Project",
-      "commandLineArgs": "\"C:\\Users\\robert.krausse\\Downloads\\TngBridgeCrew.png\""
+      "commandLineArgs": "\"E:\\Yes-Man\\Pictures\\sofa.jpg\" \"E:\\_test\""
     }
   }
 }
