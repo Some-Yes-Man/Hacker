@@ -46,7 +46,7 @@ namespace ShatteredAndShuffled {
         public ColorTupleRGB[] ImageData { get; set; }
 
         public ColorTupleRGB GetImagePixel(int x, int y) {
-            return this.ImageData[ y * DATA_WIDTH + x ];
+            return this.ImageData[y * DATA_WIDTH + x];
         }
 
         [XmlIgnore]
@@ -66,7 +66,7 @@ namespace ShatteredAndShuffled {
 
         private static bool EdgePatternMatches(bool[] a, bool[] b) {
             for (int i = 0; i < EGDE_LENGTH; i++) {
-                if (!(a[ i ] ^ b[ i ])) {
+                if (!(a[i] ^ b[i])) {
                     return false;
                 }
             }
@@ -96,7 +96,7 @@ namespace ShatteredAndShuffled {
             }
             // exactly one element left
             if (possible.Count == 1) {
-                return new List<Tuple<PieceData, long>>(new Tuple<PieceData, long>[] { new Tuple<PieceData, long>(possible[ 0 ], 0) });
+                return new List<Tuple<PieceData, long>>(new Tuple<PieceData, long>[] { new Tuple<PieceData, long>(possible[0], 0) });
             }
             // more than one element left
             List<Tuple<PieceData, long>> differences = new List<Tuple<PieceData, long>>();
@@ -173,44 +173,44 @@ namespace ShatteredAndShuffled {
 
         public PieceData(string filename, Bitmap bitmap) {
             this.Filename = filename;
-            this.NorthPattern = new bool[ EGDE_LENGTH ];
+            this.NorthPattern = new bool[EGDE_LENGTH];
             for (int i = 0; i < EGDE_LENGTH; i++) {
                 if (CompareColorsRGB(bitmap.GetPixel(7 + i * 3, 3), Color.White) ^ CompareColorsRGB(bitmap.GetPixel(7 + i * 3, 4), Color.White)) {
                     this.IsBorderNorth = true;
                     break;
                 }
-                this.NorthPattern[ i ] = CompareColorsRGB(bitmap.GetPixel(7 + i * 3, 3), Color.White) && CompareColorsRGB(bitmap.GetPixel(7 + i * 3, 4), Color.White);
+                this.NorthPattern[i] = CompareColorsRGB(bitmap.GetPixel(7 + i * 3, 3), Color.White) && CompareColorsRGB(bitmap.GetPixel(7 + i * 3, 4), Color.White);
             }
-            this.SouthPattern = new bool[ EGDE_LENGTH ];
+            this.SouthPattern = new bool[EGDE_LENGTH];
             for (int i = 0; i < EGDE_LENGTH; i++) {
                 if (CompareColorsRGB(bitmap.GetPixel(7 + i * 3, 23), Color.White) ^ CompareColorsRGB(bitmap.GetPixel(7 + i * 3, 24), Color.White)) {
                     this.IsBorderSouth = true;
                     break;
                 }
-                this.SouthPattern[ i ] = CompareColorsRGB(bitmap.GetPixel(7 + i * 3, 23), Color.White) && CompareColorsRGB(bitmap.GetPixel(7 + i * 3, 24), Color.White);
+                this.SouthPattern[i] = CompareColorsRGB(bitmap.GetPixel(7 + i * 3, 23), Color.White) && CompareColorsRGB(bitmap.GetPixel(7 + i * 3, 24), Color.White);
             }
-            this.EastPattern = new bool[ EGDE_LENGTH ];
+            this.EastPattern = new bool[EGDE_LENGTH];
             for (int i = 0; i < EGDE_LENGTH; i++) {
                 if (CompareColorsRGB(bitmap.GetPixel(23, 7 + i * 3), Color.White) ^ CompareColorsRGB(bitmap.GetPixel(24, 7 + i * 3), Color.White)) {
                     this.IsBorderEast = true;
                     break;
                 }
-                this.EastPattern[ i ] = CompareColorsRGB(bitmap.GetPixel(23, 7 + i * 3), Color.White) && CompareColorsRGB(bitmap.GetPixel(24, 7 + i * 3), Color.White);
+                this.EastPattern[i] = CompareColorsRGB(bitmap.GetPixel(23, 7 + i * 3), Color.White) && CompareColorsRGB(bitmap.GetPixel(24, 7 + i * 3), Color.White);
             }
-            this.WestPattern = new bool[ EGDE_LENGTH ];
+            this.WestPattern = new bool[EGDE_LENGTH];
             for (int i = 0; i < EGDE_LENGTH; i++) {
                 if (CompareColorsRGB(bitmap.GetPixel(3, 7 + i * 3), Color.White) ^ CompareColorsRGB(bitmap.GetPixel(4, 7 + i * 3), Color.White)) {
                     this.IsBorderWest = true;
                     break;
                 }
-                this.WestPattern[ i ] = CompareColorsRGB(bitmap.GetPixel(3, 7 + i * 3), Color.White) && CompareColorsRGB(bitmap.GetPixel(4, 7 + i * 3), Color.White);
+                this.WestPattern[i] = CompareColorsRGB(bitmap.GetPixel(3, 7 + i * 3), Color.White) && CompareColorsRGB(bitmap.GetPixel(4, 7 + i * 3), Color.White);
             }
 
-            this.ImageData = new ColorTupleRGB[ DATA_WIDTH * DATA_HEIGHT ];
+            this.ImageData = new ColorTupleRGB[DATA_WIDTH * DATA_HEIGHT];
             for (int y = 0; y < DATA_HEIGHT; y++) {
                 for (int x = 0; x < DATA_WIDTH; x++) {
                     Color foo = bitmap.GetPixel(x + 2, y + 2);
-                    this.ImageData[ y * DATA_HEIGHT + x ] = new ColorTupleRGB(foo.R, foo.G, foo.B);
+                    this.ImageData[y * DATA_HEIGHT + x] = new ColorTupleRGB(foo.R, foo.G, foo.B);
                 }
             }
         }

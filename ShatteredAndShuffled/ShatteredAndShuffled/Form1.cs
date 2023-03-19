@@ -13,7 +13,7 @@ namespace ShatteredAndShuffled {
         const int PUZZLE_WIDTH = 80;
         const int PUZZLE_HEIGHT = 60;
         const string DATA_FILE = "foo.xml";
-        const string PIECE_DIRECTORY = "C:\\Users\\rkrausse\\Downloads\\pieces";
+        const string PIECE_DIRECTORY = "E:\\_test";
 
         private HashSet<PieceData> pieceData;
         private readonly XmlSerializer xmlSerializer = new XmlSerializer(typeof(HashSet<PieceData>));

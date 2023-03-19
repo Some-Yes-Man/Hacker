@@ -14,20 +14,20 @@ namespace ShatterThosePictures {
         // [2 * OFFSET] + [COUNT * (THICC + SPACE)] - SPACE
 
         // puzzle #2
-        public const byte DATA_WIDTH = 57;
-        public const byte BIT_OFFSET = 10;
-        public const byte BIT_COUNT = 5;
-        public const byte BIT_THICCNESS = 5;
-        public const byte BIT_SPACING = 3;
+        //public const byte DATA_WIDTH = 57;
+        //public const byte BIT_OFFSET = 10;
+        //public const byte BIT_COUNT = 5;
+        //public const byte BIT_THICCNESS = 5;
+        //public const byte BIT_SPACING = 3;
 
         // puzzle #1
-        //public const byte DATA_WIDTH = 24;
-        //public const byte BIT_COUNT = 5;
-        //public const byte BIT_THICCNESS = 2;
-        //public const byte BIT_OFFSET = 5;
-        //public const byte BIT_SPACING = 1;
+        public const byte DATA_WIDTH = 24;
+        public const byte BIT_OFFSET = 5;
+        public const byte BIT_COUNT = 5;
+        public const byte BIT_THICCNESS = 2;
+        public const byte BIT_SPACING = 1;
+        public const byte BIT_LENGTH = 2;
         public const byte DATA_HEIGHT = DATA_WIDTH;
-        public const byte BIT_LENGTH = 4;
 
         private static int ID_GENERATOR = 0;
 
@@ -229,13 +229,13 @@ namespace ShatterThosePictures {
 
         public void LoadData(Image<Rgba32> image, int pieceOffsetX, int pieceOffsetY) {
             image.ProcessPixelRows(accessor => {
-                int startY = pieceOffsetY * (DATA_HEIGHT - BIT_LENGTH);
-                int endY = pieceOffsetY * (DATA_HEIGHT - BIT_LENGTH) + DATA_HEIGHT;
+                int startY = pieceOffsetY * (DATA_HEIGHT - 2 * BIT_LENGTH);
+                int endY = pieceOffsetY * (DATA_HEIGHT - 2 * BIT_LENGTH) + DATA_HEIGHT;
 
                 for (int y = startY; y < endY; y++) {
                     Span<Rgba32> row = accessor.GetRowSpan(y);
-                    int startX = pieceOffsetX * (DATA_WIDTH - BIT_LENGTH);
-                    int endX = pieceOffsetX * (DATA_WIDTH - BIT_LENGTH) + DATA_WIDTH;
+                    int startX = pieceOffsetX * (DATA_WIDTH - 2 * BIT_LENGTH);
+                    int endX = pieceOffsetX * (DATA_WIDTH - 2 * BIT_LENGTH) + DATA_WIDTH;
 
                     for (int x = startX; x < endX; x++) {
                         ref Rgba32 pixel = ref row[x];

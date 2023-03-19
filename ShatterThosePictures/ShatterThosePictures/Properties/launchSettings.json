@@ -2,7 +2,7 @@
   "profiles": {
     "ShatterThosePictures": {
       "commandName": "Project",
-      "commandLineArgs": "\"E:\\Yes-Man\\Pictures\\sofa.jpg\" \"E:\\_test\""
+      "commandLineArgs": "\"E:\\Yes-Man\\Pictures\\project.jpg\" \"E:\\_test\""
     }
   }
 }

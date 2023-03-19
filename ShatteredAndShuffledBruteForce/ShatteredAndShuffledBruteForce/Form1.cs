@@ -167,7 +167,7 @@ namespace ShatteredAndShuffledBruteForce {
 
         private void BorderSolverWorker_DoWork(object sender, DoWorkEventArgs e) {
             HashSet<PuzzlePiece> borderPieces = this.pieceData.Where(x => x.PuzzleEdges.Count < 4).ToHashSet();
-            this.solve(borderPieces, borderCounterEdgeMap);
+            //this.solve(borderPieces, borderCounterEdgeMap);
         }
 
         private void BorderSolverWorker_ProgressChanged(object sender, ProgressChangedEventArgs e) {
