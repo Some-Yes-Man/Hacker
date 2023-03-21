@@ -29,14 +29,15 @@ namespace ShatterThosePictures {
         public const byte BIT_LENGTH = 2;
         public const byte DATA_HEIGHT = DATA_WIDTH;
 
+        private static readonly byte EDGE_MATCH_BYTE = (byte)(Math.Pow(2, BIT_COUNT) - 1);
         private static int ID_GENERATOR = 0;
 
         public int Id { get; private set; }
 
-        private BitArray north = new BitArray(1);
-        private BitArray south = new BitArray(1);
-        private BitArray east = new BitArray(1);
-        private BitArray west = new BitArray(1);
+        private BitArray north = new(1);
+        private BitArray south = new(1);
+        private BitArray east = new(1);
+        private BitArray west = new(1);
         private byte northEdge;
         private byte southEdge;
         private byte eastEdge;
@@ -71,7 +72,7 @@ namespace ShatterThosePictures {
         }
 
         public HashSet<Direction> PuzzleEdges { get; set; }
-        public Color[,] ImageData { get; set; }
+        public Image<Rgba32> ImageData { get; set; }
         public string Filename { get; set; }
 
         private static bool BitmapRowIsCore(Image<Rgba32> image, byte y, Rgba32 backgroundColor) {
@@ -120,7 +121,7 @@ namespace ShatterThosePictures {
 
         public PuzzlePiece() {
             this.PuzzleEdges = new HashSet<Direction>() { };
-            this.ImageData = new Color[DATA_WIDTH, DATA_HEIGHT];
+            this.ImageData = new(DATA_WIDTH, DATA_HEIGHT, Color.Transparent);
             this.Filename = string.Empty;
         }
 
@@ -128,7 +129,7 @@ namespace ShatterThosePictures {
             this.Id = ++ID_GENERATOR;
             this.Filename = filename;
             this.PuzzleEdges = new HashSet<Direction>();
-            this.ImageData = new Color[DATA_WIDTH, DATA_HEIGHT];
+            this.ImageData = new(DATA_WIDTH, DATA_HEIGHT, Color.Transparent);
 
             // get initial pixel & data area
             Logger.Trace("Reading '{filename}'.", filename);
@@ -368,6 +369,67 @@ namespace ShatterThosePictures {
                 }
             });
             image.Save(filename);
+        }
+
+        private static bool EdgeMatches(byte edgeA, byte edgeB) {
+            return (edgeA ^ edgeB) == EDGE_MATCH_BYTE;
+        }
+
+        public static bool EdgeMatches(PuzzlePiece pieceA, PuzzlePiece pieceB, Direction edgeOnA) {
+            switch (edgeOnA) {
+                case Direction.NORTH:
+                    return EdgeMatches(pieceA.NorthEdge, pieceB.SouthEdge);
+                case Direction.SOUTH:
+                    return EdgeMatches(pieceA.SouthEdge, pieceB.NorthEdge);
+                case Direction.EAST:
+                    return EdgeMatches(pieceA.EastEdge, pieceB.WestEdge);
+                case Direction.WEST:
+                    return EdgeMatches(pieceA.WestEdge, pieceB.EastEdge);
+                default:
+                    Logger.Warn("Unknown direction used for edge matching.");
+                    return false;
+            }
+        }
+
+        public static void SaveTrainingData(PuzzlePiece pieceA, PuzzlePiece pieceB, Direction edgeOnA, string filename) {
+            Image<Rgba32> trainingImage = new(DATA_WIDTH, 4 * BIT_LENGTH, Color.Transparent);
+            Image<Rgba32> imageA = pieceA.ImageData.Clone();
+            Image<Rgba32> imageB = pieceB.ImageData.Clone();
+            switch (edgeOnA) {
+                case Direction.NORTH:
+                    // no rotation needed
+                    break;
+                case Direction.SOUTH:
+                    imageA.Mutate(x => x.Rotate(RotateMode.Rotate180));
+                    imageB.Mutate(x => x.Rotate(RotateMode.Rotate180));
+                    break;
+                case Direction.EAST:
+                    imageA.Mutate(x => x.Rotate(RotateMode.Rotate270));
+                    imageB.Mutate(x => x.Rotate(RotateMode.Rotate270));
+                    break;
+                case Direction.WEST:
+                    imageA.Mutate(x => x.Rotate(RotateMode.Rotate90));
+                    imageB.Mutate(x => x.Rotate(RotateMode.Rotate90));
+                    break;
+                case Direction.UNKNOWN:
+                default:
+                    Logger.Warn("Unknown direction while saving training data.");
+                    break;
+            }
+
+            imageA.ProcessPixelRows(trainingImage, (accessA, accessTrain) => {
+                for (int y = 0; y < 2 * BIT_LENGTH; y++) {
+                    Span<Rgba32> row = accessA.GetRowSpan(y);
+                    row.CopyTo(accessTrain.GetRowSpan(2 * BIT_LENGTH + y));
+                }
+            });
+            imageB.ProcessPixelRows(trainingImage, (accessB, accessTrain) => {
+                for (int y = 0; y < 2 * BIT_LENGTH; y++) {
+                    Span<Rgba32> row = accessB.GetRowSpan((DATA_HEIGHT - 2 * BIT_LENGTH) + y);
+                    row.CopyTo(accessTrain.GetRowSpan(y));
+                }
+            });
+            trainingImage.Save(filename);
         }
 
         public override int GetHashCode() {

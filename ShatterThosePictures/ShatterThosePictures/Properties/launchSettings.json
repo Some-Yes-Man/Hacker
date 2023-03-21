@@ -2,7 +2,7 @@
   "profiles": {
     "ShatterThosePictures": {
       "commandName": "Project",
-      "commandLineArgs": "\"E:\\Yes-Man\\Pictures\\project.jpg\" \"E:\\_test\""
+      "commandLineArgs": "\"C:\\Users\\robert.krausse\\Downloads\\TngBridge.png\" \"C:\\Users\\robert.krausse\\Downloads\\ShatterTest\" \"C:\\Users\\robert.krausse\\Downloads\\ShatterTraining\""
     }
   }
 }
