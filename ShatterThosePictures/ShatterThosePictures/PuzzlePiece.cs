@@ -1,5 +1,6 @@
 ﻿using NLog;
 using System.Collections;
+using System.Text;
 
 namespace ShatterThosePictures {
     public class PuzzlePiece {
@@ -391,8 +392,10 @@ namespace ShatterThosePictures {
             }
         }
 
-        public static void SaveTrainingData(PuzzlePiece pieceA, PuzzlePiece pieceB, Direction edgeOnA, string filename) {
-            Image<Rgba32> trainingImage = new(DATA_WIDTH, 4 * BIT_LENGTH, Color.Transparent);
+        private static Image<Rgba32> GenerateTrainingData(PuzzlePiece pieceA, PuzzlePiece pieceB, Direction edgeOnA) {
+            const int trainingWidth = DATA_WIDTH - 2 * BIT_LENGTH;
+            const int trainingHeight = 2 * (BIT_OFFSET - BIT_LENGTH);
+            Image<Rgba32> trainingImage = new(trainingWidth, trainingHeight, Color.Transparent);
             Image<Rgba32> imageA = pieceA.ImageData.Clone();
             Image<Rgba32> imageB = pieceB.ImageData.Clone();
             switch (edgeOnA) {
@@ -417,19 +420,53 @@ namespace ShatterThosePictures {
                     break;
             }
 
+            // first image; just copy the top
             imageA.ProcessPixelRows(trainingImage, (accessA, accessTrain) => {
-                for (int y = 0; y < 2 * BIT_LENGTH; y++) {
-                    Span<Rgba32> row = accessA.GetRowSpan(y);
-                    row.CopyTo(accessTrain.GetRowSpan(2 * BIT_LENGTH + y));
+                for (int y = 0; y < BIT_OFFSET; y++) {
+                    Span<Rgba32> rowA = accessA.GetRowSpan(y);
+                    Span<Rgba32> rowTrain = accessTrain.GetRowSpan(y + (trainingHeight - BIT_OFFSET));
+                    for (int i = BIT_LENGTH; i < DATA_WIDTH - BIT_LENGTH; i++) {
+                        ref Rgba32 pixel = ref rowA[i];
+                        rowTrain[i - BIT_LENGTH] = pixel;
+                    }
                 }
             });
+            // 2nd image; be a bit more subtle and skip the transparent parts
             imageB.ProcessPixelRows(trainingImage, (accessB, accessTrain) => {
-                for (int y = 0; y < 2 * BIT_LENGTH; y++) {
-                    Span<Rgba32> row = accessB.GetRowSpan((DATA_HEIGHT - 2 * BIT_LENGTH) + y);
-                    row.CopyTo(accessTrain.GetRowSpan(y));
+                for (int y = 0; y < BIT_OFFSET; y++) {
+                    Span<Rgba32> rowB = accessB.GetRowSpan((DATA_HEIGHT - BIT_OFFSET) + y);
+                    Span<Rgba32> rowTrain = accessTrain.GetRowSpan(y);
+                    for (int i = BIT_LENGTH; i < DATA_WIDTH - BIT_LENGTH; i++) {
+                        ref Rgba32 pixel = ref rowB[i];
+                        if (!Color.Transparent.Equals(pixel)) {
+                            rowTrain[i - BIT_LENGTH] = pixel;
+                        }
+                    }
                 }
             });
-            trainingImage.Save(filename);
+
+            return trainingImage;
+        }
+
+        public static void SaveTrainingData(PuzzlePiece pieceA, PuzzlePiece pieceB, Direction edgeOnA, string filename) {
+            GenerateTrainingData(pieceA, pieceB, edgeOnA).Save(filename);
+        }
+
+        public static string GenerateCsvTrainingData(PuzzlePiece pieceA, PuzzlePiece pieceB, Direction edgeOnA, bool match) {
+            Image<Rgba32> trainingImage = GenerateTrainingData(pieceA, pieceB, edgeOnA);
+            // width * height * 4 (byte plus comma) + 2 (comma and match bit)
+            StringBuilder csvBuilder = new(trainingImage.Width * trainingImage.Height * 4 + 2);
+            trainingImage.ProcessPixelRows(accessor => {
+                for (int y = 0; y < trainingImage.Height; y++) {
+                    Span<Rgba32> row = accessor.GetRowSpan(y);
+                    for (int x = 0; x < trainingImage.Width; x++) {
+                        ref Rgba32 pixel = ref row[x];
+                        csvBuilder.Append(pixel.R.ToString("D3")).Append(',').Append(pixel.G.ToString("D3")).Append(',').Append(pixel.B.ToString("D3")).Append(',');
+                    }
+                }
+            });
+            csvBuilder.Append(match ? '1' : '0');
+            return csvBuilder.ToString();
         }
 
         public override int GetHashCode() {

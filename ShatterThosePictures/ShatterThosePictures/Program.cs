@@ -7,6 +7,22 @@ namespace ShatterThosePictures {
 
         private static readonly Direction[] DIRECTIONS = new Direction[4] { Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST };
 
+        private static bool PieceTwoIsNeighborOfPieceOneInGivenDirection(int oneX, int oneY, int twoX, int twoY, Direction direction) {
+            switch (direction) {
+                case Direction.NORTH:
+                    return (oneY - twoY == 1) && (oneX == twoX);
+                case Direction.SOUTH:
+                    return (twoY - oneY == 1) && (oneX == twoX);
+                case Direction.EAST:
+                    return (twoX - oneX == 1) && (oneY == twoY);
+                case Direction.WEST:
+                    return (oneX - twoX == 1) && (oneY == twoY);
+                default:
+                    Logger.Warn("Unknown direction during neighbor test.");
+                    return false;
+            }
+        }
+
         static void Main(string[] args) {
             Logger.Info("Let's shred this picture!!");
 
@@ -51,7 +67,7 @@ namespace ShatterThosePictures {
                 for (int y = 0; y < piecesHeight; y++) {
                     for (int x = 0; x < piecesWidth; x++) {
                         pieces[x, y].LoadData(image, x, y);
-                        //pieces[x, y].SaveToFile(Path.Combine(args[1], "Piece" + x.ToString("D3") + y.ToString("D3") + ".png"));
+                        pieces[x, y].SaveToFile(Path.Combine(args[1], "Piece" + x.ToString("D3") + y.ToString("D3") + ".png"));
                     }
                 }
                 Logger.Info("Copied and masked image data.");
@@ -60,7 +76,7 @@ namespace ShatterThosePictures {
                 int pieceCount = piecesWidth * piecesHeight;
                 List<Tuple<int, int, PuzzlePiece>>[,,] pieceMatches = new List<Tuple<int, int, PuzzlePiece>>[piecesWidth, piecesHeight, 4];
 
-                int countMatches = 0;
+                int physicalMatches = 0;
                 for (int d = 0; d < 4; d++) {
                     // iterating index-based to avoid duplication in matching
                     for (int indexOne = 0; indexOne < pieceCount; indexOne++) {
@@ -73,28 +89,39 @@ namespace ShatterThosePictures {
                             int twoY = indexTwo / piecesWidth;
                             PuzzlePiece pieceTwo = pieces[twoX, twoY];
                             if (PuzzlePiece.EdgeMatches(pieceOne, pieceTwo, DIRECTIONS[d])) {
-                                countMatches++;
+                                physicalMatches++;
                                 pieceMatches[oneX, oneY, d].Add(new Tuple<int, int, PuzzlePiece>(twoX, twoY, pieceTwo));
                             }
                         }
                     }
                     Logger.Info("Matching {} edges.", DIRECTIONS[d]);
                 }
-                Logger.Info("Found {} matches.", countMatches);
+                Logger.Info("Found {} physical matches.", physicalMatches);
 
                 Logger.Info("Saving training data.");
+                int correctMatches = 0;
+                using StreamWriter csvFile = new(Path.Combine(args[2], "_data.csv"), new FileStreamOptions() { Access = FileAccess.Write, Mode = FileMode.Create });
                 for (int y = 0; y < piecesHeight; y++) {
                     for (int x = 0; x < piecesWidth; x++) {
-                        for (int d = 0; d < 1; d++) {
+                        PuzzlePiece pieceA = pieces[x, y];
+                        for (int d = 0; d < 4; d++) {
                             int matchCount = pieceMatches[x, y, d].Count;
                             for (int m = 0; m < matchCount; m++) {
-                                Tuple<int, int, PuzzlePiece> match = pieceMatches[x, y, d][m];
-                                PuzzlePiece.SaveTrainingData(pieces[x, y], match.Item3, DIRECTIONS[d], Path.Combine(args[2],
-                                    string.Format("{0:D3}{1:D3}-{2:D3}{3:D3}-{4}.png", x, y, match.Item1, match.Item2, d)));
+                                Tuple<int, int, PuzzlePiece> physMatch = pieceMatches[x, y, d][m];
+                                PuzzlePiece pieceB = physMatch.Item3;
+
+                                bool correctPiece = PieceTwoIsNeighborOfPieceOneInGivenDirection(x, y, physMatch.Item1, physMatch.Item2, DIRECTIONS[d]);
+                                if (correctPiece) {
+                                    correctMatches++;
+                                    //PuzzlePiece.SaveTrainingData(pieceA, pieceB, DIRECTIONS[d], Path.Combine(args[2],
+                                    //    string.Format("{0:D3}{1:D3}-{2:D3}{3:D3}-{4}-{5}.png", x, y, physMatch.Item1, physMatch.Item2, d, correctPiece ? '1' : '0')));
+                                }
+                                csvFile.WriteLine(PuzzlePiece.GenerateCsvTrainingData(pieceA, pieceB, DIRECTIONS[d], correctPiece));
                             }
                         }
                     }
                 }
+                Logger.Info("Found {} correct matches. The proper number would have been {}.", correctMatches, ((piecesWidth - 1) * (piecesHeight - 1) * 2 + (piecesWidth - 1) + (piecesHeight - 1)));
 
                 Logger.Info("Done!");
             }
